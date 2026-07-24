@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -12,10 +12,11 @@ import {
   Plus,
   Trash2,
   LogOut,
+  Settings as SettingsIcon,
 } from "lucide-react";
 import type { Session } from "@supabase/supabase-js";
 
-import { createQuote, listMyQuotes } from "@/lib/quotes.functions";
+import { createQuote, getMySettings, listMyQuotes } from "@/lib/quotes.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,7 +31,7 @@ import {
 } from "@/components/ui/select";
 import { Toaster } from "@/components/ui/sonner";
 
-const UNIT_PRICE = 150;
+const DEFAULT_UNIT_PRICE = 150;
 const currency = new Intl.NumberFormat("nl-NL", {
   style: "currency",
   currency: "EUR",
