@@ -295,7 +295,7 @@ export const generateQuote = createServerFn({ method: "POST" })
     const { supabase } = context;
     const { data: configs, error: cErr } = await supabase
       .from("configurations")
-      .select("option_name, option_value, quantity, unit_price, total_price")
+      .select("option_name, option_value, quantity, unit_price, total_price, product_id")
       .eq("project_id", data.project_id);
     if (cErr) throw new Error(cErr.message);
     if (!configs || configs.length === 0) throw new Error("Voeg eerst configuratieregels toe");
@@ -317,6 +317,7 @@ export const generateQuote = createServerFn({ method: "POST" })
 
     const items = configs.map((c) => ({
       quote_id: quote.id,
+      product_id: c.product_id ?? null,
       description:
         c.option_name + (c.option_value ? ` — ${c.option_value}` : ""),
       quantity: c.quantity,
