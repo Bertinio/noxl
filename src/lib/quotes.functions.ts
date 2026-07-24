@@ -43,7 +43,7 @@ export const getMySettings = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { supabase, userId } = context;
-    const unit_price = await getOrCreateUnitPrice(supabase as never, userId);
+    const unit_price = await getOrCreateUnitPrice(supabase, userId);
     return { unit_price };
   });
 
@@ -74,7 +74,7 @@ export const createQuote = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => quoteInputSchema.parse(input))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-    const unit_price = await getOrCreateUnitPrice(supabase as never, userId);
+    const unit_price = await getOrCreateUnitPrice(supabase, userId);
 
     const { data: quote, error: quoteError } = await supabase
       .from("quotes")
