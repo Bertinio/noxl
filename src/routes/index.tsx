@@ -121,6 +121,13 @@ function QuoteApp({ session }: { session: Session }) {
   const queryClient = useQueryClient();
   const saveQuote = useServerFn(createQuote);
   const fetchMyQuotes = useServerFn(listMyQuotes);
+  const fetchSettings = useServerFn(getMySettings);
+
+  const settings = useQuery({
+    queryKey: ["my-settings"],
+    queryFn: () => fetchSettings(),
+  });
+  const unitPrice = settings.data?.unit_price ?? DEFAULT_UNIT_PRICE;
 
   const myQuotes = useQuery({
     queryKey: ["my-quotes"],
@@ -137,12 +144,12 @@ function QuoteApp({ session }: { session: Session }) {
   const totals = useMemo(() => {
     const rows = items.map((it) => {
       const area = itemArea(it);
-      return { area, total: area * UNIT_PRICE };
+      return { area, total: area * unitPrice };
     });
     const area = rows.reduce((s, r) => s + r.area, 0);
     const total = rows.reduce((s, r) => s + r.total, 0);
     return { rows, area, total };
-  }, [items]);
+  }, [items, unitPrice]);
 
   function updateItem(key: string, patch: Partial<LineItem>) {
     setItems((prev) => prev.map((it) => (it.key === key ? { ...it, ...patch } : it)));
