@@ -14,13 +14,57 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      quotes: {
+        Row: {
+          area_m2: number | null
+          created_at: string
+          customer_email: string
+          customer_name: string
+          height_mm: number
+          id: string
+          notes: string | null
+          product_type: string
+          quote_number: string
+          total_ex_vat: number | null
+          unit_price: number
+          width_mm: number
+        }
+        Insert: {
+          area_m2?: number | null
+          created_at?: string
+          customer_email: string
+          customer_name: string
+          height_mm: number
+          id?: string
+          notes?: string | null
+          product_type: string
+          quote_number?: string
+          total_ex_vat?: number | null
+          unit_price?: number
+          width_mm: number
+        }
+        Update: {
+          area_m2?: number | null
+          created_at?: string
+          customer_email?: string
+          customer_name?: string
+          height_mm?: number
+          id?: string
+          notes?: string | null
+          product_type?: string
+          quote_number?: string
+          total_ex_vat?: number | null
+          unit_price?: number
+          width_mm?: number
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      generate_quote_number: { Args: never; Returns: string }
     }
     Enums: {
       [_ in never]: never
