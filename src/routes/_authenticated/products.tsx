@@ -100,7 +100,7 @@ function ProductsPage() {
                   <TableHead>Naam</TableHead>
                   <TableHead>Categorie</TableHead>
                   <TableHead>Beschrijving</TableHead>
-                  <TableHead className="text-right">Prijs/stuk</TableHead>
+                  <TableHead className="text-right">Prijs/m²</TableHead>
                   <TableHead />
                 </TableRow>
               </TableHeader>
@@ -145,7 +145,7 @@ function ProductsPage() {
               <Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={3} />
             </div>
             <div className="grid gap-1.5">
-              <Label>Prijs per stuk (€)</Label>
+              <Label>Prijs per m² (€)</Label>
               <Input type="number" min={0} step="0.01" value={form.unit_price}
                 onChange={(e) => setForm({ ...form, unit_price: Number(e.target.value) || 0 })} />
             </div>

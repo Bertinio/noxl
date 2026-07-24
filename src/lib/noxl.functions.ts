@@ -136,7 +136,7 @@ export const getProject = createServerFn({ method: "GET" })
     if (!project) throw new Error("Project niet gevonden");
     const { data: configs } = await context.supabase
       .from("configurations")
-      .select("id, option_name, option_value, quantity, unit_price, total_price, product_id, created_at")
+      .select("id, option_name, option_value, quantity, unit_price, total_price, product_id, width_mm, height_mm, area_m2, created_at")
       .eq("project_id", data.id)
       .order("created_at", { ascending: true });
     const { data: quotes } = await context.supabase
@@ -242,6 +242,8 @@ const configItemSchema = z.object({
   product_id: z.string().uuid(),
   option_name: z.string().trim().min(1).max(200),
   option_value: z.string().trim().max(500).optional().nullable(),
+  width_mm: z.number().min(0).max(100000),
+  height_mm: z.number().min(0).max(100000),
   quantity: z.number().int().min(0).max(100000),
   unit_price: z.number().min(0).max(1_000_000),
 });
@@ -262,29 +264,37 @@ export const saveConfigurations = createServerFn({ method: "POST" })
       .eq("project_id", data.project_id);
     if (delErr) throw new Error(delErr.message);
 
-    if (data.items.length > 0) {
-      const payload = data.items.map((it) => ({
+    const computed = data.items.map((it) => {
+      const area = (it.width_mm * it.height_mm) / 1_000_000;
+      const line = area * it.unit_price * it.quantity;
+      return { it, area, line: Number(line.toFixed(2)) };
+    });
+
+    if (computed.length > 0) {
+      const payload = computed.map(({ it, line }) => ({
         project_id: data.project_id,
         product_id: it.product_id,
         option_name: it.option_name,
         option_value: it.option_value ?? null,
+        width_mm: it.width_mm,
+        height_mm: it.height_mm,
         quantity: it.quantity,
         unit_price: it.unit_price,
-        total_price: Number((it.quantity * it.unit_price).toFixed(2)),
+        total_price: line,
       }));
       const { error: insErr } = await supabase.from("configurations").insert(payload);
       if (insErr) throw new Error(insErr.message);
     }
 
-    const total = data.items.reduce((s, it) => s + it.quantity * it.unit_price, 0);
-    const status = data.items.length > 0 ? "configured" : "draft";
+    const total = computed.reduce((s, c) => s + c.line, 0);
+    const status = computed.length > 0 ? "configured" : "draft";
     const { error: upErr } = await supabase
       .from("projects")
       .update({ total_price: Number(total.toFixed(2)), status })
       .eq("id", data.project_id);
     if (upErr) throw new Error(upErr.message);
 
-    return { total_price: Number(total.toFixed(2)), count: data.items.length };
+    return { total_price: Number(total.toFixed(2)), count: computed.length };
   });
 
 // ---------- quotes ----------
@@ -295,7 +305,7 @@ export const generateQuote = createServerFn({ method: "POST" })
     const { supabase } = context;
     const { data: configs, error: cErr } = await supabase
       .from("configurations")
-      .select("option_name, option_value, quantity, unit_price, total_price, product_id")
+      .select("option_name, option_value, quantity, unit_price, total_price, product_id, width_mm, height_mm")
       .eq("project_id", data.project_id);
     if (cErr) throw new Error(cErr.message);
     if (!configs || configs.length === 0) throw new Error("Voeg eerst configuratieregels toe");
@@ -320,6 +330,8 @@ export const generateQuote = createServerFn({ method: "POST" })
       product_id: c.product_id ?? null,
       description:
         c.option_name + (c.option_value ? ` — ${c.option_value}` : ""),
+      width_mm: c.width_mm,
+      height_mm: c.height_mm,
       quantity: c.quantity,
       unit_price: Number(c.unit_price),
       total_price: Number(c.total_price ?? 0),

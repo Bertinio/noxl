@@ -16,7 +16,9 @@ export type Database = {
     Tables: {
       configurations: {
         Row: {
+          area_m2: number | null
           created_at: string
+          height_mm: number | null
           id: string
           option_name: string
           option_value: string | null
@@ -25,9 +27,12 @@ export type Database = {
           quantity: number
           total_price: number
           unit_price: number
+          width_mm: number | null
         }
         Insert: {
+          area_m2?: number | null
           created_at?: string
+          height_mm?: number | null
           id?: string
           option_name: string
           option_value?: string | null
@@ -36,9 +41,12 @@ export type Database = {
           quantity?: number
           total_price?: number
           unit_price?: number
+          width_mm?: number | null
         }
         Update: {
+          area_m2?: number | null
           created_at?: string
+          height_mm?: number | null
           id?: string
           option_name?: string
           option_value?: string | null
@@ -47,6 +55,7 @@ export type Database = {
           quantity?: number
           total_price?: number
           unit_price?: number
+          width_mm?: number | null
         }
         Relationships: [
           {
@@ -157,34 +166,43 @@ export type Database = {
       }
       project_quote_items: {
         Row: {
+          area_m2: number | null
           created_at: string
           description: string
+          height_mm: number | null
           id: string
           product_id: string | null
           quantity: number
           quote_id: string
           total_price: number
           unit_price: number
+          width_mm: number | null
         }
         Insert: {
+          area_m2?: number | null
           created_at?: string
           description: string
+          height_mm?: number | null
           id?: string
           product_id?: string | null
           quantity?: number
           quote_id: string
           total_price?: number
           unit_price?: number
+          width_mm?: number | null
         }
         Update: {
+          area_m2?: number | null
           created_at?: string
           description?: string
+          height_mm?: number | null
           id?: string
           product_id?: string | null
           quantity?: number
           quote_id?: string
           total_price?: number
           unit_price?: number
+          width_mm?: number | null
         }
         Relationships: [
           {

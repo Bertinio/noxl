@@ -19,18 +19,24 @@ export const Route = createFileRoute("/_authenticated/project/$projectId/configu
 });
 
 const currency = new Intl.NumberFormat("nl-BE", { style: "currency", currency: "EUR" });
+const num = new Intl.NumberFormat("nl-BE", { maximumFractionDigits: 3 });
 
 type Row = {
   product_id: string;
   option_name: string;
   option_value: string;
+  width_mm: number;
+  height_mm: number;
   quantity: number;
-  unit_price: number;
+  unit_price: number; // per m²
 };
 
 function emptyRow(): Row {
-  return { product_id: "", option_name: "", option_value: "", quantity: 1, unit_price: 0 };
+  return { product_id: "", option_name: "", option_value: "", width_mm: 0, height_mm: 0, quantity: 1, unit_price: 0 };
 }
+
+function area(r: Row) { return (r.width_mm * r.height_mm) / 1_000_000; }
+function lineTotal(r: Row) { return area(r) * r.unit_price * r.quantity; }
 
 export default function Configurator() {
   const { projectId } = Route.useParams();
@@ -56,6 +62,8 @@ export default function Configurator() {
             product_id: c.product_id as string,
             option_name: c.option_name,
             option_value: c.option_value ?? "",
+            width_mm: Number(c.width_mm) || 0,
+            height_mm: Number(c.height_mm) || 0,
             quantity: c.quantity,
             unit_price: Number(c.unit_price),
           })),
@@ -63,8 +71,8 @@ export default function Configurator() {
     }
   }, [projectQ.data]);
 
-  const grandTotal = rows.reduce((s, r) => s + r.quantity * r.unit_price, 0)
-    + (newRow.product_id ? newRow.quantity * newRow.unit_price : 0);
+  const grandTotal = rows.reduce((s, r) => s + lineTotal(r), 0)
+    + (newRow.product_id ? lineTotal(newRow) : 0);
 
   const saveMut = useMutation({
     mutationFn: (items: Row[]) =>
@@ -75,6 +83,8 @@ export default function Configurator() {
             product_id: r.product_id,
             option_name: r.option_name,
             option_value: r.option_value || null,
+            width_mm: r.width_mm,
+            height_mm: r.height_mm,
             quantity: r.quantity,
             unit_price: r.unit_price,
           })),
@@ -88,16 +98,17 @@ export default function Configurator() {
     const p = (productsQ.data ?? []).find((x) => x.id === productId);
     if (!p) return;
     setNewRow({
+      ...newRow,
       product_id: p.id,
       option_name: p.name,
       option_value: p.description ?? "",
-      quantity: newRow.quantity || 1,
       unit_price: Number(p.unit_price) || 0,
     });
   }
 
   function addRule() {
     if (!newRow.product_id) { toast.error("Kies een product"); return; }
+    if (newRow.width_mm <= 0 || newRow.height_mm <= 0) { toast.error("Vul breedte en hoogte in"); return; }
     const next = [...rows, newRow];
     setRows(next);
     setNewRow(emptyRow());
@@ -141,9 +152,11 @@ export default function Configurator() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Product</TableHead>
-                  <TableHead>Beschrijving</TableHead>
+                  <TableHead className="text-right">B (mm)</TableHead>
+                  <TableHead className="text-right">H (mm)</TableHead>
+                  <TableHead className="text-right">m²</TableHead>
                   <TableHead className="text-right">Aantal</TableHead>
-                  <TableHead className="text-right">Prijs/stuk</TableHead>
+                  <TableHead className="text-right">Prijs/m²</TableHead>
                   <TableHead className="text-right">Totaal</TableHead>
                   <TableHead />
                 </TableRow>
@@ -152,17 +165,19 @@ export default function Configurator() {
                 {rows.map((r, i) => (
                   <TableRow key={i}>
                     <TableCell className="font-medium">{r.option_name}</TableCell>
-                    <TableCell className="text-muted-foreground">{r.option_value || "—"}</TableCell>
+                    <TableCell className="text-right">{r.width_mm}</TableCell>
+                    <TableCell className="text-right">{r.height_mm}</TableCell>
+                    <TableCell className="text-right">{num.format(area(r))}</TableCell>
                     <TableCell className="text-right">{r.quantity}</TableCell>
                     <TableCell className="text-right">{currency.format(r.unit_price)}</TableCell>
-                    <TableCell className="text-right">{currency.format(r.quantity * r.unit_price)}</TableCell>
+                    <TableCell className="text-right">{currency.format(lineTotal(r))}</TableCell>
                     <TableCell className="text-right">
                       <Button variant="ghost" size="icon" onClick={() => removeRule(i)}><Trash2 className="h-4 w-4" /></Button>
                     </TableCell>
                   </TableRow>
                 ))}
                 {rows.length === 0 && (
-                  <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">Nog geen regels</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">Nog geen regels</TableCell></TableRow>
                 )}
               </TableBody>
             </Table>
@@ -177,7 +192,7 @@ export default function Configurator() {
                 Nog geen producten. Voeg eerst producten toe via <Link to="/products" className="underline">Producten</Link>.
               </p>
             ) : (
-              <div className="grid grid-cols-[1.4fr_1.4fr_90px_120px_120px_auto] gap-2 items-end">
+              <div className="grid gap-3">
                 <div className="grid gap-1.5">
                   <label className="text-xs text-muted-foreground">Product</label>
                   <Select value={newRow.product_id} onValueChange={pickProduct}>
@@ -185,36 +200,45 @@ export default function Configurator() {
                     <SelectContent>
                       {products.map((p) => (
                         <SelectItem key={p.id} value={p.id}>
-                          {p.name} — {currency.format(Number(p.unit_price) || 0)}
+                          {p.name} — {currency.format(Number(p.unit_price) || 0)}/m²
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="grid gap-1.5">
-                  <label className="text-xs text-muted-foreground">Beschrijving</label>
-                  <Input value={newRow.option_value} onChange={(e) => setNewRow({ ...newRow, option_value: e.target.value })} placeholder="Optioneel" />
-                </div>
-                <div className="grid gap-1.5">
-                  <label className="text-xs text-muted-foreground">Aantal</label>
-                  <Input type="number" min={0} value={newRow.quantity}
-                    onChange={(e) => setNewRow({ ...newRow, quantity: Number(e.target.value) || 0 })}
-                    className="text-right" />
-                </div>
-                <div className="grid gap-1.5">
-                  <label className="text-xs text-muted-foreground">Prijs/stuk</label>
-                  <div className="h-9 flex items-center justify-end text-sm">{currency.format(newRow.unit_price)}</div>
-                </div>
-                <div className="grid gap-1.5">
-                  <label className="text-xs text-muted-foreground">Regeltotaal</label>
-                  <div className="h-9 flex items-center justify-end text-sm font-medium">
-                    {currency.format(newRow.quantity * newRow.unit_price)}
+                <div className="grid grid-cols-[1fr_120px_120px_90px_auto] gap-2 items-end">
+                  <div className="grid gap-1.5">
+                    <label className="text-xs text-muted-foreground">Beschrijving</label>
+                    <Input value={newRow.option_value} onChange={(e) => setNewRow({ ...newRow, option_value: e.target.value })} placeholder="Optioneel" />
                   </div>
+                  <div className="grid gap-1.5">
+                    <label className="text-xs text-muted-foreground">Breedte (mm)</label>
+                    <Input type="number" min={0} value={newRow.width_mm || ""}
+                      onChange={(e) => setNewRow({ ...newRow, width_mm: Number(e.target.value) || 0 })}
+                      className="text-right" />
+                  </div>
+                  <div className="grid gap-1.5">
+                    <label className="text-xs text-muted-foreground">Hoogte (mm)</label>
+                    <Input type="number" min={0} value={newRow.height_mm || ""}
+                      onChange={(e) => setNewRow({ ...newRow, height_mm: Number(e.target.value) || 0 })}
+                      className="text-right" />
+                  </div>
+                  <div className="grid gap-1.5">
+                    <label className="text-xs text-muted-foreground">Aantal</label>
+                    <Input type="number" min={1} value={newRow.quantity}
+                      onChange={(e) => setNewRow({ ...newRow, quantity: Number(e.target.value) || 0 })}
+                      className="text-right" />
+                  </div>
+                  <Button onClick={addRule} disabled={saveMut.isPending || !newRow.product_id}>
+                    {saveMut.isPending ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Plus className="mr-1 h-4 w-4" />}
+                    Toevoegen
+                  </Button>
                 </div>
-                <Button onClick={addRule} disabled={saveMut.isPending || !newRow.product_id}>
-                  {saveMut.isPending ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Plus className="mr-1 h-4 w-4" />}
-                  Toevoegen
-                </Button>
+                <div className="grid grid-cols-3 gap-2 text-sm rounded-md bg-muted/40 p-3">
+                  <div>Oppervlakte: <strong>{num.format(area(newRow))} m²</strong></div>
+                  <div>Prijs/m²: <strong>{currency.format(newRow.unit_price)}</strong></div>
+                  <div className="text-right">Regeltotaal: <strong>{currency.format(lineTotal(newRow))}</strong></div>
+                </div>
               </div>
             )}
           </CardContent>
