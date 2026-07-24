@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -12,10 +12,11 @@ import {
   Plus,
   Trash2,
   LogOut,
+  Settings as SettingsIcon,
 } from "lucide-react";
 import type { Session } from "@supabase/supabase-js";
 
-import { createQuote, listMyQuotes } from "@/lib/quotes.functions";
+import { createQuote, getMySettings, listMyQuotes } from "@/lib/quotes.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,7 +31,7 @@ import {
 } from "@/components/ui/select";
 import { Toaster } from "@/components/ui/sonner";
 
-const UNIT_PRICE = 150;
+const DEFAULT_unitPrice = 150;
 const currency = new Intl.NumberFormat("nl-NL", {
   style: "currency",
   currency: "EUR",
@@ -120,6 +121,13 @@ function QuoteApp({ session }: { session: Session }) {
   const queryClient = useQueryClient();
   const saveQuote = useServerFn(createQuote);
   const fetchMyQuotes = useServerFn(listMyQuotes);
+  const fetchSettings = useServerFn(getMySettings);
+
+  const settings = useQuery({
+    queryKey: ["my-settings"],
+    queryFn: () => fetchSettings(),
+  });
+  const unitPrice = settings.data?.unit_price ?? DEFAULT_unitPrice;
 
   const myQuotes = useQuery({
     queryKey: ["my-quotes"],
@@ -136,12 +144,12 @@ function QuoteApp({ session }: { session: Session }) {
   const totals = useMemo(() => {
     const rows = items.map((it) => {
       const area = itemArea(it);
-      return { area, total: area * UNIT_PRICE };
+      return { area, total: area * unitPrice };
     });
     const area = rows.reduce((s, r) => s + r.area, 0);
     const total = rows.reduce((s, r) => s + r.total, 0);
     return { rows, area, total };
-  }, [items]);
+  }, [items, unitPrice]);
 
   function updateItem(key: string, patch: Partial<LineItem>) {
     setItems((prev) => prev.map((it) => (it.key === key ? { ...it, ...patch } : it)));
@@ -236,6 +244,12 @@ function QuoteApp({ session }: { session: Session }) {
             <span className="hidden text-xs text-muted-foreground sm:inline">
               {session.user.email}
             </span>
+            <Button variant="outline" size="sm" asChild>
+              <Link to="/settings">
+                <SettingsIcon className="mr-2 h-4 w-4" />
+                Instellingen
+              </Link>
+            </Button>
             <Button variant="outline" size="sm" onClick={handleSignOut}>
               <LogOut className="mr-2 h-4 w-4" />
               Uitloggen
@@ -444,7 +458,7 @@ function QuoteApp({ session }: { session: Session }) {
               <div>
                 <div className="opacity-70">Basisprijs</div>
                 <div className="mt-1 font-medium">
-                  {currency.format(UNIT_PRICE)} / m²
+                  {currency.format(unitPrice)} / m²
                 </div>
               </div>
             </div>
