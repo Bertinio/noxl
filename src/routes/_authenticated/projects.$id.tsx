@@ -64,7 +64,7 @@ function ProjectDetail() {
               </div>
             </div>
             <div className="flex gap-2">
-              <Button asChild><Link to="/projects/$id/configurator" params={{ id }}><Wrench className="mr-1 h-4 w-4" /> Open configurator</Link></Button>
+              <Button asChild><Link to="/project/$projectId/configurator" params={{ projectId: id }}><Wrench className="mr-1 h-4 w-4" /> Open configurator</Link></Button>
               <Button variant="secondary" onClick={() => generateMut.mutate()} disabled={generateMut.isPending || data.configurations.length === 0}>
                 {generateMut.isPending ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <FileText className="mr-1 h-4 w-4" />} Genereer offerte
               </Button>

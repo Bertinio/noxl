@@ -19,6 +19,7 @@ import { Route as AuthenticatedCustomersIdRouteImport } from './routes/_authenti
 import { Route as AuthenticatedQuotesIdPrintRouteImport } from './routes/_authenticated/quotes.$id.print'
 import { Route as AuthenticatedProjectsIdQuotesRouteImport } from './routes/_authenticated/projects.$id.quotes'
 import { Route as AuthenticatedProjectsIdConfiguratorRouteImport } from './routes/_authenticated/projects.$id.configurator'
+import { Route as AuthenticatedProjectProjectIdConfiguratorRouteImport } from './routes/_authenticated/project.$projectId.configurator'
 
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
@@ -73,6 +74,12 @@ const AuthenticatedProjectsIdConfiguratorRoute =
     path: '/configurator',
     getParentRoute: () => AuthenticatedProjectsIdRoute,
   } as any)
+const AuthenticatedProjectProjectIdConfiguratorRoute =
+  AuthenticatedProjectProjectIdConfiguratorRouteImport.update({
+    id: '/project/$projectId/configurator',
+    path: '/project/$projectId/configurator',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AuthenticatedIndexRoute
@@ -81,6 +88,7 @@ export interface FileRoutesByFullPath {
   '/portal': typeof AuthenticatedPortalRoute
   '/customers/$id': typeof AuthenticatedCustomersIdRoute
   '/projects/$id': typeof AuthenticatedProjectsIdRouteWithChildren
+  '/project/$projectId/configurator': typeof AuthenticatedProjectProjectIdConfiguratorRoute
   '/projects/$id/configurator': typeof AuthenticatedProjectsIdConfiguratorRoute
   '/projects/$id/quotes': typeof AuthenticatedProjectsIdQuotesRoute
   '/quotes/$id/print': typeof AuthenticatedQuotesIdPrintRoute
@@ -92,6 +100,7 @@ export interface FileRoutesByTo {
   '/': typeof AuthenticatedIndexRoute
   '/customers/$id': typeof AuthenticatedCustomersIdRoute
   '/projects/$id': typeof AuthenticatedProjectsIdRouteWithChildren
+  '/project/$projectId/configurator': typeof AuthenticatedProjectProjectIdConfiguratorRoute
   '/projects/$id/configurator': typeof AuthenticatedProjectsIdConfiguratorRoute
   '/projects/$id/quotes': typeof AuthenticatedProjectsIdQuotesRoute
   '/quotes/$id/print': typeof AuthenticatedQuotesIdPrintRoute
@@ -105,6 +114,7 @@ export interface FileRoutesById {
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/_authenticated/customers/$id': typeof AuthenticatedCustomersIdRoute
   '/_authenticated/projects/$id': typeof AuthenticatedProjectsIdRouteWithChildren
+  '/_authenticated/project/$projectId/configurator': typeof AuthenticatedProjectProjectIdConfiguratorRoute
   '/_authenticated/projects/$id/configurator': typeof AuthenticatedProjectsIdConfiguratorRoute
   '/_authenticated/projects/$id/quotes': typeof AuthenticatedProjectsIdQuotesRoute
   '/_authenticated/quotes/$id/print': typeof AuthenticatedQuotesIdPrintRoute
@@ -118,6 +128,7 @@ export interface FileRouteTypes {
     | '/portal'
     | '/customers/$id'
     | '/projects/$id'
+    | '/project/$projectId/configurator'
     | '/projects/$id/configurator'
     | '/projects/$id/quotes'
     | '/quotes/$id/print'
@@ -129,6 +140,7 @@ export interface FileRouteTypes {
     | '/'
     | '/customers/$id'
     | '/projects/$id'
+    | '/project/$projectId/configurator'
     | '/projects/$id/configurator'
     | '/projects/$id/quotes'
     | '/quotes/$id/print'
@@ -141,6 +153,7 @@ export interface FileRouteTypes {
     | '/_authenticated/'
     | '/_authenticated/customers/$id'
     | '/_authenticated/projects/$id'
+    | '/_authenticated/project/$projectId/configurator'
     | '/_authenticated/projects/$id/configurator'
     | '/_authenticated/projects/$id/quotes'
     | '/_authenticated/quotes/$id/print'
@@ -223,6 +236,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedProjectsIdConfiguratorRouteImport
       parentRoute: typeof AuthenticatedProjectsIdRoute
     }
+    '/_authenticated/project/$projectId/configurator': {
+      id: '/_authenticated/project/$projectId/configurator'
+      path: '/project/$projectId/configurator'
+      fullPath: '/project/$projectId/configurator'
+      preLoaderRoute: typeof AuthenticatedProjectProjectIdConfiguratorRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
   }
 }
 
@@ -249,6 +269,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
   AuthenticatedCustomersIdRoute: typeof AuthenticatedCustomersIdRoute
   AuthenticatedProjectsIdRoute: typeof AuthenticatedProjectsIdRouteWithChildren
+  AuthenticatedProjectProjectIdConfiguratorRoute: typeof AuthenticatedProjectProjectIdConfiguratorRoute
   AuthenticatedQuotesIdPrintRoute: typeof AuthenticatedQuotesIdPrintRoute
 }
 
@@ -258,6 +279,8 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
   AuthenticatedCustomersIdRoute: AuthenticatedCustomersIdRoute,
   AuthenticatedProjectsIdRoute: AuthenticatedProjectsIdRouteWithChildren,
+  AuthenticatedProjectProjectIdConfiguratorRoute:
+    AuthenticatedProjectProjectIdConfiguratorRoute,
   AuthenticatedQuotesIdPrintRoute: AuthenticatedQuotesIdPrintRoute,
 }
 
