@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
+import { Route as AuthenticatedProductsRouteImport } from './routes/_authenticated/products'
 import { Route as AuthenticatedPortalRouteImport } from './routes/_authenticated/portal'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedProjectsIdRouteImport } from './routes/_authenticated/projects.$id'
@@ -33,6 +34,11 @@ const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
 const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedProductsRoute = AuthenticatedProductsRouteImport.update({
+  id: '/products',
+  path: '/products',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedPortalRoute = AuthenticatedPortalRouteImport.update({
@@ -86,6 +92,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/portal': typeof AuthenticatedPortalRoute
+  '/products': typeof AuthenticatedProductsRoute
   '/customers/$id': typeof AuthenticatedCustomersIdRoute
   '/projects/$id': typeof AuthenticatedProjectsIdRouteWithChildren
   '/project/$projectId/configurator': typeof AuthenticatedProjectProjectIdConfiguratorRoute
@@ -97,6 +104,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/portal': typeof AuthenticatedPortalRoute
+  '/products': typeof AuthenticatedProductsRoute
   '/': typeof AuthenticatedIndexRoute
   '/customers/$id': typeof AuthenticatedCustomersIdRoute
   '/projects/$id': typeof AuthenticatedProjectsIdRouteWithChildren
@@ -111,6 +119,7 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/portal': typeof AuthenticatedPortalRoute
+  '/_authenticated/products': typeof AuthenticatedProductsRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/_authenticated/customers/$id': typeof AuthenticatedCustomersIdRoute
   '/_authenticated/projects/$id': typeof AuthenticatedProjectsIdRouteWithChildren
@@ -126,6 +135,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/dashboard'
     | '/portal'
+    | '/products'
     | '/customers/$id'
     | '/projects/$id'
     | '/project/$projectId/configurator'
@@ -137,6 +147,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/dashboard'
     | '/portal'
+    | '/products'
     | '/'
     | '/customers/$id'
     | '/projects/$id'
@@ -150,6 +161,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/_authenticated/dashboard'
     | '/_authenticated/portal'
+    | '/_authenticated/products'
     | '/_authenticated/'
     | '/_authenticated/customers/$id'
     | '/_authenticated/projects/$id'
@@ -185,6 +197,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof AuthenticatedIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/products': {
+      id: '/_authenticated/products'
+      path: '/products'
+      fullPath: '/products'
+      preLoaderRoute: typeof AuthenticatedProductsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/portal': {
@@ -266,6 +285,7 @@ const AuthenticatedProjectsIdRouteWithChildren =
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedPortalRoute: typeof AuthenticatedPortalRoute
+  AuthenticatedProductsRoute: typeof AuthenticatedProductsRoute
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
   AuthenticatedCustomersIdRoute: typeof AuthenticatedCustomersIdRoute
   AuthenticatedProjectsIdRoute: typeof AuthenticatedProjectsIdRouteWithChildren
@@ -276,6 +296,7 @@ interface AuthenticatedRouteRouteChildren {
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedPortalRoute: AuthenticatedPortalRoute,
+  AuthenticatedProductsRoute: AuthenticatedProductsRoute,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
   AuthenticatedCustomersIdRoute: AuthenticatedCustomersIdRoute,
   AuthenticatedProjectsIdRoute: AuthenticatedProjectsIdRouteWithChildren,

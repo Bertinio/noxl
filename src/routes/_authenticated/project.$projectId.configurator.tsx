@@ -1,7 +1,7 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Loader2, ArrowLeft, Plus, Trash2 } from "lucide-react";
 import { AppShell } from "@/components/noxl/AppShell";
@@ -10,7 +10,8 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Toaster } from "@/components/ui/sonner";
-import { getProject, saveConfigurations } from "@/lib/noxl.functions";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { getProject, saveConfigurations, listProducts } from "@/lib/noxl.functions";
 
 export const Route = createFileRoute("/_authenticated/project/$projectId/configurator")({
   head: () => ({ meta: [{ title: "Configurator — NoXL" }] }),
@@ -19,82 +20,99 @@ export const Route = createFileRoute("/_authenticated/project/$projectId/configu
 
 const currency = new Intl.NumberFormat("nl-BE", { style: "currency", currency: "EUR" });
 
-type Row = { option_name: string; option_value: string; quantity: number; unit_price: number };
+type Row = {
+  product_id: string;
+  option_name: string;
+  option_value: string;
+  quantity: number;
+  unit_price: number;
+};
 
-function makeRow(): Row {
-  return { option_name: "", option_value: "", quantity: 1, unit_price: 0 };
+function emptyRow(): Row {
+  return { product_id: "", option_name: "", option_value: "", quantity: 1, unit_price: 0 };
 }
 
 export default function Configurator() {
   const { projectId } = Route.useParams();
-  const navigate = useNavigate();
   const fetchProject = useServerFn(getProject);
+  const fetchProducts = useServerFn(listProducts);
   const doSave = useServerFn(saveConfigurations);
 
-  const { data, isLoading } = useQuery({
+  const projectQ = useQuery({
     queryKey: ["project", projectId],
     queryFn: () => fetchProject({ data: { id: projectId } }),
   });
+  const productsQ = useQuery({ queryKey: ["products"], queryFn: () => fetchProducts() });
 
-  const [existingRows, setExistingRows] = useState<Row[]>([]);
-  const [newRow, setNewRow] = useState<Row>(makeRow());
+  const [rows, setRows] = useState<Row[]>([]);
+  const [newRow, setNewRow] = useState<Row>(emptyRow());
 
   useEffect(() => {
-    if (data) {
-      setExistingRows(
-        data.configurations.map((c) => ({
-          option_name: c.option_name,
-          option_value: c.option_value ?? "",
-          quantity: c.quantity,
-          unit_price: Number(c.unit_price),
-        })),
+    if (projectQ.data) {
+      setRows(
+        projectQ.data.configurations
+          .filter((c) => c.product_id)
+          .map((c) => ({
+            product_id: c.product_id as string,
+            option_name: c.option_name,
+            option_value: c.option_value ?? "",
+            quantity: c.quantity,
+            unit_price: Number(c.unit_price),
+          })),
       );
     }
-  }, [data]);
+  }, [projectQ.data]);
 
-  const allRows = useMemo(() => existingRows, [existingRows]);
-  const totalExisting = allRows.reduce((s, r) => s + r.quantity * r.unit_price, 0);
-  const newRowTotal = newRow.quantity * newRow.unit_price;
-  const grandTotal = totalExisting + (newRow.option_name.trim() ? newRowTotal : 0);
+  const grandTotal = rows.reduce((s, r) => s + r.quantity * r.unit_price, 0)
+    + (newRow.product_id ? newRow.quantity * newRow.unit_price : 0);
 
   const saveMut = useMutation({
     mutationFn: (items: Row[]) =>
       doSave({
         data: {
           project_id: projectId,
-          items: items
-            .filter((r) => r.option_name.trim().length > 0)
-            .map((r) => ({
-              option_name: r.option_name,
-              option_value: r.option_value || null,
-              quantity: r.quantity,
-              unit_price: r.unit_price,
-            })),
+          items: items.map((r) => ({
+            product_id: r.product_id,
+            option_name: r.option_name,
+            option_value: r.option_value || null,
+            quantity: r.quantity,
+            unit_price: r.unit_price,
+          })),
         },
       }),
     onSuccess: () => toast.success("Configuratie opgeslagen"),
     onError: (e: Error) => toast.error(e.message),
   });
 
-  if (isLoading) return <div className="flex min-h-screen items-center justify-center"><Loader2 className="h-6 w-6 animate-spin" /></div>;
-  if (!data) return null;
+  function pickProduct(productId: string) {
+    const p = (productsQ.data ?? []).find((x) => x.id === productId);
+    if (!p) return;
+    setNewRow({
+      product_id: p.id,
+      option_name: p.name,
+      option_value: p.description ?? "",
+      quantity: newRow.quantity || 1,
+      unit_price: Number(p.unit_price) || 0,
+    });
+  }
 
   function addRule() {
-    if (!newRow.option_name.trim()) {
-      toast.error("Geef een optienaam op");
-      return;
-    }
-    const next = [...existingRows, newRow];
-    setExistingRows(next);
-    setNewRow(makeRow());
+    if (!newRow.product_id) { toast.error("Kies een product"); return; }
+    const next = [...rows, newRow];
+    setRows(next);
+    setNewRow(emptyRow());
+    saveMut.mutate(next);
+  }
+  function removeRule(i: number) {
+    const next = rows.filter((_, idx) => idx !== i);
+    setRows(next);
     saveMut.mutate(next);
   }
 
-  function removeRule(i: number) {
-    const next = existingRows.filter((_, idx) => idx !== i);
-    setExistingRows(next);
-    saveMut.mutate(next);
-  }
+  if (projectQ.isLoading) return <div className="flex min-h-screen items-center justify-center"><Loader2 className="h-6 w-6 animate-spin" /></div>;
+  if (!projectQ.data) return null;
+
+  const products = productsQ.data ?? [];
 
   return (
     <AppShell role="admin" title="Configurator">
@@ -110,9 +128,9 @@ export default function Configurator() {
 
       <div className="grid gap-6">
         <Card>
-          <CardHeader><CardTitle>Project: {data.project.title}</CardTitle></CardHeader>
+          <CardHeader><CardTitle>Project: {projectQ.data.project.title}</CardTitle></CardHeader>
           <CardContent className="text-sm text-muted-foreground">
-            {data.project.description ?? "Geen beschrijving"}
+            {projectQ.data.project.description ?? "Geen beschrijving"}
           </CardContent>
         </Card>
 
@@ -122,8 +140,8 @@ export default function Configurator() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Optie</TableHead>
-                  <TableHead>Waarde</TableHead>
+                  <TableHead>Product</TableHead>
+                  <TableHead>Beschrijving</TableHead>
                   <TableHead className="text-right">Aantal</TableHead>
                   <TableHead className="text-right">Prijs/stuk</TableHead>
                   <TableHead className="text-right">Totaal</TableHead>
@@ -131,21 +149,19 @@ export default function Configurator() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {existingRows.map((r, i) => (
+                {rows.map((r, i) => (
                   <TableRow key={i}>
                     <TableCell className="font-medium">{r.option_name}</TableCell>
-                    <TableCell>{r.option_value || "—"}</TableCell>
+                    <TableCell className="text-muted-foreground">{r.option_value || "—"}</TableCell>
                     <TableCell className="text-right">{r.quantity}</TableCell>
                     <TableCell className="text-right">{currency.format(r.unit_price)}</TableCell>
                     <TableCell className="text-right">{currency.format(r.quantity * r.unit_price)}</TableCell>
                     <TableCell className="text-right">
-                      <Button variant="ghost" size="icon" onClick={() => removeRule(i)}>
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      <Button variant="ghost" size="icon" onClick={() => removeRule(i)}><Trash2 className="h-4 w-4" /></Button>
                     </TableCell>
                   </TableRow>
                 ))}
-                {existingRows.length === 0 && (
+                {rows.length === 0 && (
                   <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">Nog geen regels</TableCell></TableRow>
                 )}
               </TableBody>
@@ -156,32 +172,51 @@ export default function Configurator() {
         <Card>
           <CardHeader><CardTitle>Nieuwe regel toevoegen</CardTitle></CardHeader>
           <CardContent>
-            <div className="grid grid-cols-[1fr_1fr_90px_120px_120px_auto] gap-2 items-end">
-              <div className="grid gap-1.5">
-                <label className="text-xs text-muted-foreground">Optienaam</label>
-                <Input value={newRow.option_name} onChange={(e) => setNewRow({ ...newRow, option_name: e.target.value })} placeholder="bv. Raamtype" />
+            {products.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                Nog geen producten. Voeg eerst producten toe via <Link to="/products" className="underline">Producten</Link>.
+              </p>
+            ) : (
+              <div className="grid grid-cols-[1.4fr_1.4fr_90px_120px_120px_auto] gap-2 items-end">
+                <div className="grid gap-1.5">
+                  <label className="text-xs text-muted-foreground">Product</label>
+                  <Select value={newRow.product_id} onValueChange={pickProduct}>
+                    <SelectTrigger><SelectValue placeholder="Kies een product" /></SelectTrigger>
+                    <SelectContent>
+                      {products.map((p) => (
+                        <SelectItem key={p.id} value={p.id}>
+                          {p.name} — {currency.format(Number(p.unit_price) || 0)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid gap-1.5">
+                  <label className="text-xs text-muted-foreground">Beschrijving</label>
+                  <Input value={newRow.option_value} onChange={(e) => setNewRow({ ...newRow, option_value: e.target.value })} placeholder="Optioneel" />
+                </div>
+                <div className="grid gap-1.5">
+                  <label className="text-xs text-muted-foreground">Aantal</label>
+                  <Input type="number" min={0} value={newRow.quantity}
+                    onChange={(e) => setNewRow({ ...newRow, quantity: Number(e.target.value) || 0 })}
+                    className="text-right" />
+                </div>
+                <div className="grid gap-1.5">
+                  <label className="text-xs text-muted-foreground">Prijs/stuk</label>
+                  <div className="h-9 flex items-center justify-end text-sm">{currency.format(newRow.unit_price)}</div>
+                </div>
+                <div className="grid gap-1.5">
+                  <label className="text-xs text-muted-foreground">Regeltotaal</label>
+                  <div className="h-9 flex items-center justify-end text-sm font-medium">
+                    {currency.format(newRow.quantity * newRow.unit_price)}
+                  </div>
+                </div>
+                <Button onClick={addRule} disabled={saveMut.isPending || !newRow.product_id}>
+                  {saveMut.isPending ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Plus className="mr-1 h-4 w-4" />}
+                  Toevoegen
+                </Button>
               </div>
-              <div className="grid gap-1.5">
-                <label className="text-xs text-muted-foreground">Waarde</label>
-                <Input value={newRow.option_value} onChange={(e) => setNewRow({ ...newRow, option_value: e.target.value })} placeholder="bv. Dubbel glas" />
-              </div>
-              <div className="grid gap-1.5">
-                <label className="text-xs text-muted-foreground">Aantal</label>
-                <Input type="number" min={0} value={newRow.quantity} onChange={(e) => setNewRow({ ...newRow, quantity: Number(e.target.value) || 0 })} className="text-right" />
-              </div>
-              <div className="grid gap-1.5">
-                <label className="text-xs text-muted-foreground">Prijs/stuk</label>
-                <Input type="number" min={0} step="0.01" value={newRow.unit_price} onChange={(e) => setNewRow({ ...newRow, unit_price: Number(e.target.value) || 0 })} className="text-right" />
-              </div>
-              <div className="grid gap-1.5">
-                <label className="text-xs text-muted-foreground">Regeltotaal</label>
-                <div className="h-9 flex items-center justify-end text-sm font-medium">{currency.format(newRowTotal)}</div>
-              </div>
-              <Button onClick={addRule} disabled={saveMut.isPending}>
-                {saveMut.isPending ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Plus className="mr-1 h-4 w-4" />}
-                Toevoegen
-              </Button>
-            </div>
+            )}
           </CardContent>
         </Card>
       </div>
