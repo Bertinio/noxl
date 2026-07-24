@@ -14,6 +14,80 @@ export type Database = {
   }
   public: {
     Tables: {
+      configurations: {
+        Row: {
+          created_at: string
+          id: string
+          option_name: string
+          option_value: string | null
+          project_id: string
+          quantity: number
+          total_price: number
+          unit_price: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          option_name: string
+          option_value?: string | null
+          project_id: string
+          quantity?: number
+          total_price?: number
+          unit_price?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          option_name?: string
+          option_value?: string | null
+          project_id?: string
+          quantity?: number
+          total_price?: number
+          unit_price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "configurations_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      customers: {
+        Row: {
+          address: string | null
+          company: string | null
+          created_at: string
+          email: string | null
+          id: string
+          name: string
+          owner_id: string
+          updated_at: string
+        }
+        Insert: {
+          address?: string | null
+          company?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          name: string
+          owner_id: string
+          updated_at?: string
+        }
+        Update: {
+          address?: string | null
+          company?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          name?: string
+          owner_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       installer_settings: {
         Row: {
           created_at: string
@@ -34,6 +108,114 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      project_quote_items: {
+        Row: {
+          created_at: string
+          description: string
+          id: string
+          quantity: number
+          quote_id: string
+          total_price: number
+          unit_price: number
+        }
+        Insert: {
+          created_at?: string
+          description: string
+          id?: string
+          quantity?: number
+          quote_id: string
+          total_price?: number
+          unit_price?: number
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          id?: string
+          quantity?: number
+          quote_id?: string
+          total_price?: number
+          unit_price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_quote_items_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "project_quotes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_quotes: {
+        Row: {
+          created_at: string
+          id: string
+          project_id: string
+          quote_number: string
+          total_price: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          project_id: string
+          quote_number?: string
+          total_price?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          project_id?: string
+          quote_number?: string
+          total_price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_quotes_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      projects: {
+        Row: {
+          created_at: string
+          customer_id: string
+          description: string | null
+          id: string
+          status: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          customer_id: string
+          description?: string | null
+          id?: string
+          status?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          customer_id?: string
+          description?: string | null
+          id?: string
+          status?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "projects_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       quote_items: {
         Row: {
