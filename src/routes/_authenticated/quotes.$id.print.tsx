@@ -1,10 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useEffect } from "react";
-import { Loader2, Printer } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Loader2, Mail, Printer } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { getQuote } from "@/lib/noxl.functions";
+import { getQuote, resendQuoteEmail } from "@/lib/noxl.functions";
 
 export const Route = createFileRoute("/_authenticated/quotes/$id/print")({
   head: () => ({ meta: [{ title: "Offerte — PDF" }] }),
