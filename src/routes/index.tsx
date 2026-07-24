@@ -54,7 +54,7 @@ export const Route = createFileRoute("/")({
       {
         property: "og:description",
         content:
-          "Voeg meerdere ramen en rolluiken toe aan één offerte, met directe berekening en veilige opslag.",
+          "Maak in seconden een nette offerte met meerdere producten: bereken oppervlakte en prijs, en sla elke offerte veilig op.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
