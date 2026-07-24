@@ -18,10 +18,8 @@ const quoteInputSchema = z.object({
   items: z.array(quoteItemSchema).min(1).max(50),
 });
 
-async function getOrCreateUnitPrice(
-  supabase: ReturnType<typeof makeCtx>,
-  userId: string,
-): Promise<number> {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function getOrCreateUnitPrice(supabase: any, userId: string): Promise<number> {
   const { data } = await supabase
     .from("installer_settings")
     .select("unit_price")
@@ -39,11 +37,6 @@ async function getOrCreateUnitPrice(
     return DEFAULT_UNIT_PRICE;
   }
   return Number(created.unit_price);
-}
-
-// helper type only
-function makeCtx(_: never): never {
-  return _;
 }
 
 export const getMySettings = createServerFn({ method: "GET" })
