@@ -14,17 +14,16 @@ export type Database = {
   }
   public: {
     Tables: {
-      quotes: {
+      quote_items: {
         Row: {
           area_m2: number | null
           created_at: string
-          customer_email: string
-          customer_name: string
           height_mm: number
           id: string
           notes: string | null
+          position: number
           product_type: string
-          quote_number: string
+          quote_id: string
           total_ex_vat: number | null
           unit_price: number
           width_mm: number
@@ -32,13 +31,12 @@ export type Database = {
         Insert: {
           area_m2?: number | null
           created_at?: string
-          customer_email: string
-          customer_name: string
           height_mm: number
           id?: string
           notes?: string | null
+          position?: number
           product_type: string
-          quote_number?: string
+          quote_id: string
           total_ex_vat?: number | null
           unit_price?: number
           width_mm: number
@@ -46,16 +44,50 @@ export type Database = {
         Update: {
           area_m2?: number | null
           created_at?: string
-          customer_email?: string
-          customer_name?: string
           height_mm?: number
           id?: string
           notes?: string | null
+          position?: number
           product_type?: string
-          quote_number?: string
+          quote_id?: string
           total_ex_vat?: number | null
           unit_price?: number
           width_mm?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quote_items_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "quotes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quotes: {
+        Row: {
+          created_at: string
+          customer_email: string
+          customer_name: string
+          id: string
+          notes: string | null
+          quote_number: string
+        }
+        Insert: {
+          created_at?: string
+          customer_email: string
+          customer_name: string
+          id?: string
+          notes?: string | null
+          quote_number?: string
+        }
+        Update: {
+          created_at?: string
+          customer_email?: string
+          customer_name?: string
+          id?: string
+          notes?: string | null
+          quote_number?: string
         }
         Relationships: []
       }
