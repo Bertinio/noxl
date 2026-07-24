@@ -1,7 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
-import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
-import type { Database } from "@/integrations/supabase/types";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 const quoteItemSchema = z.object({
   product_type: z.enum(["raam", "rolluik"]),
@@ -17,28 +16,11 @@ const quoteInputSchema = z.object({
   items: z.array(quoteItemSchema).min(1).max(50),
 });
 
-function makeServerClient() {
-  const supabaseUrl = process.env.SUPABASE_URL!;
-  const supabaseKey = process.env.SUPABASE_PUBLISHABLE_KEY!;
-  return createClient<Database>(supabaseUrl, supabaseKey, {
-    auth: { persistSession: false, autoRefreshToken: false },
-    global: {
-      fetch: (input, init) => {
-        const h = new Headers(init?.headers);
-        if (supabaseKey.startsWith("sb_") && h.get("Authorization") === `Bearer ${supabaseKey}`) {
-          h.delete("Authorization");
-        }
-        h.set("apikey", supabaseKey);
-        return fetch(input, { ...init, headers: h });
-      },
-    },
-  });
-}
-
 export const createQuote = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => quoteInputSchema.parse(input))
-  .handler(async ({ data }) => {
-    const supabase = makeServerClient();
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
 
     const { data: quote, error: quoteError } = await supabase
       .from("quotes")
@@ -46,6 +28,7 @@ export const createQuote = createServerFn({ method: "POST" })
         customer_name: data.customer_name,
         customer_email: data.customer_email,
         notes: data.notes ?? null,
+        user_id: userId,
       })
       .select("id, quote_number, created_at")
       .single();
@@ -86,4 +69,19 @@ export const createQuote = createServerFn({ method: "POST" })
       items: items ?? [],
       total_ex_vat: total,
     };
+  });
+
+export const listMyQuotes = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase } = context;
+    const { data, error } = await supabase
+      .from("quotes")
+      .select(
+        "id, quote_number, customer_name, customer_email, created_at, quote_items(id, product_type, width_mm, height_mm, area_m2, total_ex_vat, position)",
+      )
+      .order("created_at", { ascending: false })
+      .limit(50);
+    if (error) throw new Error(error.message);
+    return data ?? [];
   });
