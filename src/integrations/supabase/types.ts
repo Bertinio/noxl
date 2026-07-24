@@ -225,6 +225,7 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          last_email_sent_at: string | null
           project_id: string
           quote_number: string
           total_price: number
@@ -232,6 +233,7 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
+          last_email_sent_at?: string | null
           project_id: string
           quote_number?: string
           total_price?: number
@@ -239,6 +241,7 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
+          last_email_sent_at?: string | null
           project_id?: string
           quote_number?: string
           total_price?: number
