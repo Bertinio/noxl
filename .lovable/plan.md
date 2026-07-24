@@ -1,62 +1,53 @@
-# Offerte-app voor raam- en rolluikinstallateurs
 
-## Wat ik ga bouwen
+# Prijs per m² instelbaar per installateur
 
-Een strakke, moderne single-page offerte-tool op `/` met:
+Elke ingelogde installateur krijgt zijn eigen prijs per m². Die prijs wordt gebruikt voor de live berekening én bij het opslaan van nieuwe offertes. Bestaande offertes blijven ongewijzigd (historische prijs blijft bewaard op de offerte-regel).
 
-**Invoerformulier (links / boven op mobiel):**
-- Klantnaam (tekst, verplicht)
-- E-mailadres klant (email, verplicht, gevalideerd)
-- Type product — dropdown: Raam / Rolluik
-- Breedte in mm (nummer, > 0)
-- Hoogte in mm (nummer, > 0)
-- Notities/opmerkingen (textarea, optioneel)
-- Knop: "Offerte opslaan"
+## Wat de gebruiker ziet
 
-**Live berekening (rechts / onder op mobiel), updatet tijdens typen:**
-- Oppervlakte = breedte × hoogte / 1.000.000 → getoond in m² (2 decimalen)
-- Basisprijs: €150/m² (constante)
-- Totaalprijs excl. btw = oppervlakte × €150, groot in beeld
-- Nette samenvattingskaart met product, afmetingen, m², prijs
+- Nieuw kopje **Instellingen** rechtsboven in de header (naast Uitloggen).
+- Instellingenpaneel toont één veld: **Prijs per m² (excl. btw)**, met opslaan-knop.
+- Nieuwe installateurs starten met de standaardwaarde **€150 / m²**.
+- Op de offerte-pagina toont het live-totaal en de per-regel-berekening voortaan de eigen prijs van de installateur (in plaats van de hardgecodeerde €150).
+- "Mijn offertes" blijft de historische totalen tonen zoals ze op het moment van opslaan berekend zijn.
 
-**Na opslaan:** toast met het gegenereerde offertenummer + reset formulier.
+## Wat er onder water gebeurt
 
-## Design
+### Database
 
-Modern, zakelijk, licht thema. Één primaire accentkleur (diepblauw), veel witruimte, afgeronde kaarten, subtiele schaduw, duidelijke typografie. Semantische design tokens in `src/styles.css` — geen hardcoded kleuren. shadcn `Input`, `Select`, `Textarea`, `Button`, `Card`, `Sonner` voor toasts. Zod + react-hook-form voor validatie.
+Nieuwe tabel `public.installer_settings`:
 
-## Backend — Lovable Cloud
+```text
+user_id       uuid  PK, verwijst naar auth.users
+unit_price    numeric  NOT NULL DEFAULT 150  (CHECK > 0)
+created_at    timestamptz
+updated_at    timestamptz
+```
 
-Lovable Cloud is nog niet aan. Ik zet 'm aan en maak in dezelfde stap een migratie:
+- RLS aan; policies: elke gebruiker mag alleen zijn eigen rij lezen/aanmaken/bijwerken.
+- `GRANT` voor `authenticated` en `service_role`.
+- `updated_at`-trigger.
+- Rij wordt lazy aangemaakt bij eerste bezoek van de instellingen of eerste offerte (via upsert in server function). Geen trigger op `auth.users` nodig.
 
-**Tabel `public.quotes`:**
-- `id` uuid PK
-- `quote_number` text unique, gegenereerd als `OFF-YYYYMMDD-XXXX` via trigger/default
-- `customer_name` text
-- `customer_email` text
-- `product_type` text check in ('raam','rolluik')
-- `width_mm` int check > 0
-- `height_mm` int check > 0
-- `area_m2` numeric (gegenereerde kolom uit width×height/1.000.000)
-- `unit_price` numeric default 150
-- `total_ex_vat` numeric (gegenereerde kolom uit area × unit_price)
-- `notes` text
-- `created_at` timestamptz default now()
+`quotes.unit_price` en `quote_items.unit_price` blijven ongewijzigd — de prijs wordt per offerte-regel opgeslagen zodat historie klopt.
 
-Grants + RLS. Voor deze eerste versie (nog geen auth-scherm): tijdelijk `INSERT` en `SELECT` voor `anon` toegestaan zodat het formulier direct werkt. Ik meld duidelijk dat we later auth kunnen toevoegen om offertes per gebruiker af te schermen.
+### Server (`src/lib/quotes.functions.ts`)
 
-## Technische opzet
+Nieuwe / aangepaste server functions (allemaal met `requireSupabaseAuth`):
 
-- Formulierlogica volledig client-side (React state + zod).
-- Opslaan via `createServerFn` (`POST`) in `src/lib/quotes.functions.ts` die met de server publishable client insert doet en `quote_number` teruggeeft.
-- Route `src/routes/index.tsx` herschrijven (placeholder verwijderen), eigen `head()` met titel/description/OG.
+- `getMySettings()` — leest de rij; bij ontbreken wordt automatisch een rij met €150 aangemaakt en teruggegeven.
+- `updateMyUnitPrice(unit_price)` — valideert (positief getal, max bijv. 100.000) en upsert de rij voor de ingelogde gebruiker.
+- `createQuote(...)` (bestaand) wordt uitgebreid: leest eerst de eigen `unit_price`, en voegt bij elke regel expliciet `unit_price`, `area_m2` en `total_ex_vat` toe zodat de opgeslagen totalen gegarandeerd correct zijn (onafhankelijk van eventuele database-defaults).
 
-## Volgorde
+### Frontend (`src/routes/index.tsx` + nieuwe route)
 
-1. Lovable Cloud aanzetten.
-2. Migratie: tabel + grants + RLS + policies + generator voor `quote_number`.
-3. Server function voor insert.
-4. UI: formulier + live prijskaart op `/`.
-5. Head-metadata en toast-feedback.
+- Nieuwe route `src/routes/settings.tsx` (achter dezelfde auth-gate als de hoofdpagina) met formulier voor de prijs.
+- Header op zowel `/` als `/settings` krijgt links naar elkaar.
+- Op `/`: bij laden wordt `getMySettings()` opgehaald via React Query; de constante `UNIT_PRICE = 150` wordt vervangen door de opgehaalde waarde en gebruikt in `totals` en in de "Basisprijs / m²"-tegel.
+- Zolang de instellingen laden vult de UI de standaardwaarde 150 als plaatsvervanger, zodat het scherm niet leeg blijft.
 
-Wil je dat ik dit zo bouw?
+## Buiten scope
+
+- Aparte prijzen voor raam vs. rolluik (kan later toegevoegd worden door `installer_settings` uit te breiden of te vervangen door een `installer_prices`-tabel per producttype).
+- Btw-percentage of kortingen aanpassen per installateur.
+- Prijshistorie / audit log op wijzigingen van de eigen prijs.
