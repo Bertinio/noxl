@@ -1,53 +1,76 @@
 
-# Prijs per m² instelbaar per installateur
+# NoXL MVP — plan
 
-Elke ingelogde installateur krijgt zijn eigen prijs per m². Die prijs wordt gebruikt voor de live berekening én bij het opslaan van nieuwe offertes. Bestaande offertes blijven ongewijzigd (historische prijs blijft bewaard op de offerte-regel).
+Deze MVP vervangt de huidige ramen/rolluiken-offertetool. Ik bouw NoXL bovenop de tabellen die vorige stap al zijn aangemaakt (`customers`, `projects`, `configurations`, `project_quotes`, `project_quote_items`) en breid ze uit voor het klantportaal.
 
-## Wat de gebruiker ziet
+## Belangrijke keuze eerst — twee rollen
 
-- Nieuw kopje **Instellingen** rechtsboven in de header (naast Uitloggen).
-- Instellingenpaneel toont één veld: **Prijs per m² (excl. btw)**, met opslaan-knop.
-- Nieuwe installateurs starten met de standaardwaarde **€150 / m²**.
-- Op de offerte-pagina toont het live-totaal en de per-regel-berekening voortaan de eigen prijs van de installateur (in plaats van de hardgecodeerde €150).
-- "Mijn offertes" blijft de historische totalen tonen zoals ze op het moment van opslaan berekend zijn.
+Je vroeg eerder "geen auth per klant", maar nu vraag je een **klantportaal met magic-link login**. Dat kan alleen als elke Customer óók een auth-user is. Ik ga daarom door met dit model:
 
-## Wat er onder water gebeurt
+- **Installateur (admin)** — logt in, ziet álle eigen klanten/projecten/offertes, bouwt configuraties en genereert offertes.
+- **Klant (portaal)** — logt in via magic link, ziet alleen z'n eigen projecten en offertes, kan PDF downloaden.
 
-### Database
+Één auth-tabel (`auth.users`), rol bepaald door een `user_roles` tabel (`admin` / `customer`). RLS werkt op basis van rol + eigenaar.
 
-Nieuwe tabel `public.installer_settings`:
+## Wat er onder water verandert
 
+### Database (migratie)
+- `customers`: `auth_user_id uuid REFERENCES auth.users` (uniek, nullable tot invite voltooid), plus `owner_id` blijft (installateur).
+- `projects`: `total_price numeric DEFAULT 0` toevoegen (voor prijsengine).
+- Nieuwe enum + tabel `app_role` / `user_roles` (admin, customer) met `has_role()` security-definer.
+- Trigger: bij `project_quotes` insert wordt `projects.status = 'quoted'` gezet.
+- RLS herschreven:
+  - Admin (`has_role(admin)`) → ziet alles wat hij bezit via `customers.owner_id`.
+  - Customer (`has_role(customer)`) → ziet alleen rijen waar `customers.auth_user_id = auth.uid()` (via join).
+- GRANTs zoals vereist.
+
+### Server functions (`src/lib/noxl.functions.ts`)
+Allemaal met `requireSupabaseAuth`:
+- `listCustomers`, `getCustomer`, `createCustomer` (stuurt magic-link invite via admin API), `updateCustomer`.
+- `listProjects`, `getProject`, `createProject`, `updateProjectStatus`.
+- `listConfigurations`, `upsertConfigurations` (batch insert/update/delete regels).
+- `calculateProjectTotal(project_id)` — som van `configurations.total_price`, update `projects.total_price`.
+- `generateQuote(project_id)` — maakt Quote + kopieert configuraties naar QuoteItems, `quote_number = "Q-" + short(project_id) + "-" + timestamp`, zet project op `quoted`.
+- `listQuotes`, `getQuoteForPdf` (haalt customer + project + items).
+- `myPortalData` — voor klantportaal (alleen eigen projecten/offertes).
+
+### PDF-generatie
+- Server route `src/routes/api/quotes/$quoteId.pdf.ts` — auth check, genereert PDF met `pdfkit` (Worker-compatibel) en streamt terug. Zwart-wit tabel-layout met customer, project, items, totaal, datum, offertenummer.
+
+### UI-routes (TanStack)
 ```text
-user_id       uuid  PK, verwijst naar auth.users
-unit_price    numeric  NOT NULL DEFAULT 150  (CHECK > 0)
-created_at    timestamptz
-updated_at    timestamptz
+src/routes/
+  auth.tsx                              (bestaand — login + magic link)
+  _authenticated/route.tsx              (bestaand — auth gate)
+  _authenticated/index.tsx              → redirect op basis van rol
+  _admin/                                (nested onder _authenticated, gate op admin)
+    dashboard.tsx                       Customers + Projects tabellen, "Nieuw project"
+    customers.$id.tsx                   Customer detail + projectenlijst
+    projects.$id.tsx                    Project detail: status, config-regels, totaal, knoppen
+    projects.$id.configurator.tsx       Configurator UI
+    projects.$id.quotes.tsx             Offertes van project + Download PDF
+  _portal/                               (klantportaal, gate op customer)
+    portal.tsx                          Eigen projecten + offertes + PDF-download
 ```
 
-- RLS aan; policies: elke gebruiker mag alleen zijn eigen rij lezen/aanmaken/bijwerken.
-- `GRANT` voor `authenticated` en `service_role`.
-- `updated_at`-trigger.
-- Rij wordt lazy aangemaakt bij eerste bezoek van de instellingen of eerste offerte (via upsert in server function). Geen trigger op `auth.users` nodig.
+Layout: shadcn Sidebar met navigatie (Dashboard / Klanten / Projecten voor admin; Mijn projecten / Mijn offertes voor klant). Tabellen met sorteerbare kolommen (tanstack-table). Buttons: primary blauw, secondary grijs via bestaande tokens.
 
-`quotes.unit_price` en `quote_items.unit_price` blijven ongewijzigd — de prijs wordt per offerte-regel opgeslagen zodat historie klopt.
+## Wat je gaat zien
 
-### Server (`src/lib/quotes.functions.ts`)
+1. **Login** — één `/auth` scherm, magic-link + wachtwoord. Na login stuurt de app je door naar `/dashboard` (admin) of `/portal` (klant).
+2. **Admin dashboard** — twee tabellen (Klanten, Projecten), knop "Nieuw project" en "Nieuwe klant". Sidebar navigatie.
+3. **Customer detail** — klantgegevens, projectenlijst, knop "Nieuw project voor deze klant".
+4. **Project detail** — titel/status/beschrijving, tabel met configuratieregels, live totaal, knoppen "Open configurator" en "Genereer offerte".
+5. **Configurator** — dynamische rijen (optienaam, waarde, qty, unit price → total auto), "Regel toevoegen", "Opslaan", "Terug".
+6. **Offerte-overzicht** — offertes per project, totaal, "Genereer PDF".
+7. **PDF** — eenvoudige zwart/wit tabel met alle vereiste velden.
+8. **Klantportaal** — eigen projecten, eigen offertes, PDF-download; geen admin-toegang.
 
-Nieuwe / aangepaste server functions (allemaal met `requireSupabaseAuth`):
+## Buiten scope (bewust)
+- Verwijderen van de oude ramen/rolluiken-tabellen (`quotes`, `quote_items`, `installer_settings`). Blijven staan, worden niet meer gebruikt door de UI. Laat het weten als je ze wil droppen.
+- Btw-percentage, kortingen, meerdere talen, betaling.
+- Klant kan zelf configuraties bewerken — portaal is read-only.
+- GitHub-export: TanStack-projecten in Lovable exporteer je via Git-sync in de workspace-instellingen. Geen aparte codewijziging nodig.
 
-- `getMySettings()` — leest de rij; bij ontbreken wordt automatisch een rij met €150 aangemaakt en teruggegeven.
-- `updateMyUnitPrice(unit_price)` — valideert (positief getal, max bijv. 100.000) en upsert de rij voor de ingelogde gebruiker.
-- `createQuote(...)` (bestaand) wordt uitgebreid: leest eerst de eigen `unit_price`, en voegt bij elke regel expliciet `unit_price`, `area_m2` en `total_ex_vat` toe zodat de opgeslagen totalen gegarandeerd correct zijn (onafhankelijk van eventuele database-defaults).
-
-### Frontend (`src/routes/index.tsx` + nieuwe route)
-
-- Nieuwe route `src/routes/settings.tsx` (achter dezelfde auth-gate als de hoofdpagina) met formulier voor de prijs.
-- Header op zowel `/` als `/settings` krijgt links naar elkaar.
-- Op `/`: bij laden wordt `getMySettings()` opgehaald via React Query; de constante `UNIT_PRICE = 150` wordt vervangen door de opgehaalde waarde en gebruikt in `totals` en in de "Basisprijs / m²"-tegel.
-- Zolang de instellingen laden vult de UI de standaardwaarde 150 als plaatsvervanger, zodat het scherm niet leeg blijft.
-
-## Buiten scope
-
-- Aparte prijzen voor raam vs. rolluik (kan later toegevoegd worden door `installer_settings` uit te breiden of te vervangen door een `installer_prices`-tabel per producttype).
-- Btw-percentage of kortingen aanpassen per installateur.
-- Prijshistorie / audit log op wijzigingen van de eigen prijs.
+## Bevestig één ding voor ik begin
+Klopt het dat elke Customer een auth-user krijgt (magic link) zodra jij (admin) hem aanmaakt? Zo nee, dan schrap ik het klantportaal-deel.
