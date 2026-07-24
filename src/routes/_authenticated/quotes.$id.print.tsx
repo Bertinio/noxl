@@ -17,6 +17,8 @@ const currency = new Intl.NumberFormat("nl-BE", { style: "currency", currency: "
 function QuotePrint() {
   const { id } = Route.useParams();
   const fetchQuote = useServerFn(getQuote);
+  const resendFn = useServerFn(resendQuoteEmail);
+  const [sending, setSending] = useState(false);
   const { data, isLoading } = useQuery({
     queryKey: ["quote", id],
     queryFn: () => fetchQuote({ data: { id } }),
@@ -25,6 +27,18 @@ function QuotePrint() {
   useEffect(() => {
     if (data) document.title = `Offerte ${data.quote.quote_number}`;
   }, [data]);
+
+  const handleResend = async () => {
+    setSending(true);
+    try {
+      await resendFn({ data: { quote_id: id } });
+      toast.success("Offerte opnieuw verzonden naar klant");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Verzenden mislukt");
+    } finally {
+      setSending(false);
+    }
+  };
 
   if (isLoading) return <div className="flex min-h-screen items-center justify-center"><Loader2 className="h-6 w-6 animate-spin" /></div>;
   if (!data) return null;
@@ -38,6 +52,10 @@ function QuotePrint() {
       <div className="mx-auto max-w-3xl p-8 print:p-0">
         <div className="mb-6 flex justify-end gap-2 print:hidden">
           <Button variant="secondary" onClick={() => window.history.back()}>Terug</Button>
+          <Button variant="secondary" onClick={handleResend} disabled={sending}>
+            {sending ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Mail className="mr-1 h-4 w-4" />}
+            Opnieuw verzenden
+          </Button>
           <Button onClick={() => window.print()}><Printer className="mr-1 h-4 w-4" /> Download PDF (print)</Button>
         </div>
 
