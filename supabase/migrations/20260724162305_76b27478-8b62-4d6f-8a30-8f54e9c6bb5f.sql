@@ -1,0 +1,1 @@
+ALTER TABLE public.project_quotes ADD COLUMN IF NOT EXISTS last_email_sent_at timestamptz;
