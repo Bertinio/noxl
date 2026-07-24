@@ -3,52 +3,87 @@ import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import type { Database } from "@/integrations/supabase/types";
 
-const quoteInputSchema = z.object({
-  customer_name: z.string().trim().min(1).max(200),
-  customer_email: z.string().trim().email().max(255),
+const quoteItemSchema = z.object({
   product_type: z.enum(["raam", "rolluik"]),
   width_mm: z.number().int().positive().max(20000),
   height_mm: z.number().int().positive().max(20000),
-  notes: z.string().trim().max(2000).optional().nullable(),
+  notes: z.string().trim().max(1000).optional().nullable(),
 });
+
+const quoteInputSchema = z.object({
+  customer_name: z.string().trim().min(1).max(200),
+  customer_email: z.string().trim().email().max(255),
+  notes: z.string().trim().max(2000).optional().nullable(),
+  items: z.array(quoteItemSchema).min(1).max(50),
+});
+
+function makeServerClient() {
+  const supabaseUrl = process.env.SUPABASE_URL!;
+  const supabaseKey = process.env.SUPABASE_PUBLISHABLE_KEY!;
+  return createClient<Database>(supabaseUrl, supabaseKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+    global: {
+      fetch: (input, init) => {
+        const h = new Headers(init?.headers);
+        if (supabaseKey.startsWith("sb_") && h.get("Authorization") === `Bearer ${supabaseKey}`) {
+          h.delete("Authorization");
+        }
+        h.set("apikey", supabaseKey);
+        return fetch(input, { ...init, headers: h });
+      },
+    },
+  });
+}
 
 export const createQuote = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => quoteInputSchema.parse(input))
   .handler(async ({ data }) => {
-    const supabaseUrl = process.env.SUPABASE_URL!;
-    const supabaseKey = process.env.SUPABASE_PUBLISHABLE_KEY!;
+    const supabase = makeServerClient();
 
-    const supabase = createClient<Database>(supabaseUrl, supabaseKey, {
-      auth: { persistSession: false, autoRefreshToken: false },
-      global: {
-        fetch: (input, init) => {
-          const h = new Headers(init?.headers);
-          if (supabaseKey.startsWith("sb_") && h.get("Authorization") === `Bearer ${supabaseKey}`) {
-            h.delete("Authorization");
-          }
-          h.set("apikey", supabaseKey);
-          return fetch(input, { ...init, headers: h });
-        },
-      },
-    });
-
-    const { data: inserted, error } = await supabase
+    const { data: quote, error: quoteError } = await supabase
       .from("quotes")
       .insert({
         customer_name: data.customer_name,
         customer_email: data.customer_email,
-        product_type: data.product_type,
-        width_mm: data.width_mm,
-        height_mm: data.height_mm,
         notes: data.notes ?? null,
       })
-      .select("id, quote_number, area_m2, total_ex_vat, created_at")
+      .select("id, quote_number, created_at")
       .single();
 
-    if (error) {
-      console.error("[createQuote] insert failed", error);
-      throw new Error(error.message);
+    if (quoteError || !quote) {
+      console.error("[createQuote] header insert failed", quoteError);
+      throw new Error(quoteError?.message ?? "Kon offerte niet opslaan");
     }
 
-    return inserted;
+    const itemsPayload = data.items.map((item, idx) => ({
+      quote_id: quote.id,
+      position: idx + 1,
+      product_type: item.product_type,
+      width_mm: Math.round(item.width_mm),
+      height_mm: Math.round(item.height_mm),
+      notes: item.notes ?? null,
+    }));
+
+    const { data: items, error: itemsError } = await supabase
+      .from("quote_items")
+      .insert(itemsPayload)
+      .select("id, position, product_type, width_mm, height_mm, area_m2, total_ex_vat");
+
+    if (itemsError) {
+      console.error("[createQuote] items insert failed", itemsError);
+      throw new Error(itemsError.message);
+    }
+
+    const total = (items ?? []).reduce(
+      (sum, i) => sum + Number(i.total_ex_vat ?? 0),
+      0,
+    );
+
+    return {
+      id: quote.id,
+      quote_number: quote.quote_number,
+      created_at: quote.created_at,
+      items: items ?? [],
+      total_ex_vat: total,
+    };
   });
