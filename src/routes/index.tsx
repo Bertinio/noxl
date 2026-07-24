@@ -31,7 +31,7 @@ import {
 } from "@/components/ui/select";
 import { Toaster } from "@/components/ui/sonner";
 
-const DEFAULT_UNIT_PRICE = 150;
+const DEFAULT_unitPrice = 150;
 const currency = new Intl.NumberFormat("nl-NL", {
   style: "currency",
   currency: "EUR",
@@ -127,7 +127,7 @@ function QuoteApp({ session }: { session: Session }) {
     queryKey: ["my-settings"],
     queryFn: () => fetchSettings(),
   });
-  const unitPrice = settings.data?.unit_price ?? DEFAULT_UNIT_PRICE;
+  const unitPrice = settings.data?.unit_price ?? DEFAULT_unitPrice;
 
   const myQuotes = useQuery({
     queryKey: ["my-quotes"],
@@ -458,7 +458,7 @@ function QuoteApp({ session }: { session: Session }) {
               <div>
                 <div className="opacity-70">Basisprijs</div>
                 <div className="mt-1 font-medium">
-                  {currency.format(UNIT_PRICE)} / m²
+                  {currency.format(unitPrice)} / m²
                 </div>
               </div>
             </div>
