@@ -136,7 +136,7 @@ export const getProject = createServerFn({ method: "GET" })
     if (!project) throw new Error("Project niet gevonden");
     const { data: configs } = await context.supabase
       .from("configurations")
-      .select("id, option_name, option_value, quantity, unit_price, total_price, created_at")
+      .select("id, option_name, option_value, quantity, unit_price, total_price, product_id, created_at")
       .eq("project_id", data.id)
       .order("created_at", { ascending: true });
     const { data: quotes } = await context.supabase
@@ -170,9 +170,76 @@ export const createProject = createServerFn({ method: "POST" })
     return { id: row.id };
   });
 
+// ---------- products ----------
+const productInputSchema = z.object({
+  name: z.string().trim().min(1).max(200),
+  description: z.string().trim().max(2000).optional().nullable(),
+  unit_price: z.number().min(0).max(1_000_000),
+  category: z.string().trim().max(100).optional().nullable(),
+});
+
+export const listProducts = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { data, error } = await context.supabase
+      .from("products")
+      .select("id, name, description, unit_price, category, created_at")
+      .order("created_at", { ascending: false });
+    if (error) throw new Error(error.message);
+    return data ?? [];
+  });
+
+export const createProduct = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => productInputSchema.parse(i))
+  .handler(async ({ data, context }) => {
+    const { data: row, error } = await context.supabase
+      .from("products")
+      .insert({
+        owner_id: context.userId,
+        name: data.name,
+        description: data.description ?? null,
+        unit_price: data.unit_price,
+        category: data.category ?? null,
+      })
+      .select("id")
+      .single();
+    if (error || !row) throw new Error(error?.message ?? "Kon product niet aanmaken");
+    return { id: row.id };
+  });
+
+export const updateProduct = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    productInputSchema.extend({ id: z.string().uuid() }).parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    const { error } = await context.supabase
+      .from("products")
+      .update({
+        name: data.name,
+        description: data.description ?? null,
+        unit_price: data.unit_price,
+        category: data.category ?? null,
+      })
+      .eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const deleteProduct = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({ id: z.string().uuid() }).parse(i))
+  .handler(async ({ data, context }) => {
+    const { error } = await context.supabase.from("products").delete().eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
 // ---------- configurations ----------
 const configItemSchema = z.object({
   id: z.string().uuid().optional(),
+  product_id: z.string().uuid(),
   option_name: z.string().trim().min(1).max(200),
   option_value: z.string().trim().max(500).optional().nullable(),
   quantity: z.number().int().min(0).max(100000),
@@ -189,7 +256,6 @@ export const saveConfigurations = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase } = context;
-    // Wipe existing config rows and re-insert — simpler than diff
     const { error: delErr } = await supabase
       .from("configurations")
       .delete()
@@ -199,6 +265,7 @@ export const saveConfigurations = createServerFn({ method: "POST" })
     if (data.items.length > 0) {
       const payload = data.items.map((it) => ({
         project_id: data.project_id,
+        product_id: it.product_id,
         option_name: it.option_name,
         option_value: it.option_value ?? null,
         quantity: it.quantity,
@@ -209,7 +276,6 @@ export const saveConfigurations = createServerFn({ method: "POST" })
       if (insErr) throw new Error(insErr.message);
     }
 
-    // Recalculate project total (price engine)
     const total = data.items.reduce((s, it) => s + it.quantity * it.unit_price, 0);
     const status = data.items.length > 0 ? "configured" : "draft";
     const { error: upErr } = await supabase
@@ -229,7 +295,7 @@ export const generateQuote = createServerFn({ method: "POST" })
     const { supabase } = context;
     const { data: configs, error: cErr } = await supabase
       .from("configurations")
-      .select("option_name, option_value, quantity, unit_price, total_price")
+      .select("option_name, option_value, quantity, unit_price, total_price, product_id")
       .eq("project_id", data.project_id);
     if (cErr) throw new Error(cErr.message);
     if (!configs || configs.length === 0) throw new Error("Voeg eerst configuratieregels toe");
@@ -251,6 +317,7 @@ export const generateQuote = createServerFn({ method: "POST" })
 
     const items = configs.map((c) => ({
       quote_id: quote.id,
+      product_id: c.product_id ?? null,
       description:
         c.option_name + (c.option_value ? ` — ${c.option_value}` : ""),
       quantity: c.quantity,

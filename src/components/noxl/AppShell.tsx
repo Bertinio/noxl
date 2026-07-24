@@ -1,5 +1,5 @@
 import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
-import { LayoutDashboard, Users, FolderKanban, LogOut, FileText, Home } from "lucide-react";
+import { LayoutDashboard, Users, FolderKanban, LogOut, FileText, Home, Package } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import {
@@ -24,6 +24,7 @@ type NavItem = { title: string; url: string; icon: React.ComponentType<{ classNa
 const adminNav: NavItem[] = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
   { title: "Klanten", url: "/dashboard", icon: Users },
+  { title: "Producten", url: "/products", icon: Package },
 ];
 
 const portalNav: NavItem[] = [

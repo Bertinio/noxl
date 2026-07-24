@@ -20,6 +20,7 @@ export type Database = {
           id: string
           option_name: string
           option_value: string | null
+          product_id: string | null
           project_id: string
           quantity: number
           total_price: number
@@ -30,6 +31,7 @@ export type Database = {
           id?: string
           option_name: string
           option_value?: string | null
+          product_id?: string | null
           project_id: string
           quantity?: number
           total_price?: number
@@ -40,12 +42,20 @@ export type Database = {
           id?: string
           option_name?: string
           option_value?: string | null
+          product_id?: string | null
           project_id?: string
           quantity?: number
           total_price?: number
           unit_price?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "configurations_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "configurations_project_id_fkey"
             columns: ["project_id"]
@@ -112,11 +122,45 @@ export type Database = {
         }
         Relationships: []
       }
+      products: {
+        Row: {
+          category: string | null
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          owner_id: string
+          unit_price: number
+          updated_at: string
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          owner_id?: string
+          unit_price?: number
+          updated_at?: string
+        }
+        Update: {
+          category?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          owner_id?: string
+          unit_price?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       project_quote_items: {
         Row: {
           created_at: string
           description: string
           id: string
+          product_id: string | null
           quantity: number
           quote_id: string
           total_price: number
@@ -126,6 +170,7 @@ export type Database = {
           created_at?: string
           description: string
           id?: string
+          product_id?: string | null
           quantity?: number
           quote_id: string
           total_price?: number
@@ -135,12 +180,20 @@ export type Database = {
           created_at?: string
           description?: string
           id?: string
+          product_id?: string | null
           quantity?: number
           quote_id?: string
           total_price?: number
           unit_price?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "project_quote_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "project_quote_items_quote_id_fkey"
             columns: ["quote_id"]
@@ -247,7 +300,7 @@ export type Database = {
           product_type: string
           quote_id: string
           total_ex_vat?: number | null
-          unit_price?: number
+          unit_price: number
           width_mm: number
         }
         Update: {
