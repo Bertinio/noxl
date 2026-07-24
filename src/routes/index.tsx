@@ -1,6 +1,7 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
   Ruler,
@@ -10,9 +11,12 @@ import {
   Loader2,
   Plus,
   Trash2,
+  LogOut,
 } from "lucide-react";
+import type { Session } from "@supabase/supabase-js";
 
-import { createQuote } from "@/lib/quotes.functions";
+import { createQuote, listMyQuotes } from "@/lib/quotes.functions";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -86,7 +90,41 @@ function itemArea(item: LineItem) {
 }
 
 function Index() {
+  const navigate = useNavigate();
+  const [session, setSession] = useState<Session | null | undefined>(undefined);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => setSession(data.session));
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => setSession(s));
+    return () => sub.subscription.unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (session === null) navigate({ to: "/auth", replace: true });
+  }, [session, navigate]);
+
+  if (session === undefined) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+  if (!session) return null;
+
+  return <QuoteApp session={session} />;
+}
+
+function QuoteApp({ session }: { session: Session }) {
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const saveQuote = useServerFn(createQuote);
+  const fetchMyQuotes = useServerFn(listMyQuotes);
+
+  const myQuotes = useQuery({
+    queryKey: ["my-quotes"],
+    queryFn: () => fetchMyQuotes(),
+  });
 
   const [customerName, setCustomerName] = useState("");
   const [customerEmail, setCustomerEmail] = useState("");
@@ -108,20 +146,24 @@ function Index() {
   function updateItem(key: string, patch: Partial<LineItem>) {
     setItems((prev) => prev.map((it) => (it.key === key ? { ...it, ...patch } : it)));
   }
-
   function removeItem(key: string) {
     setItems((prev) => (prev.length <= 1 ? prev : prev.filter((it) => it.key !== key)));
   }
-
   function addItem() {
     setItems((prev) => [...prev, newItem()]);
   }
-
   function reset() {
     setCustomerName("");
     setCustomerEmail("");
     setQuoteNotes("");
     setItems([newItem()]);
+  }
+
+  async function handleSignOut() {
+    await queryClient.cancelQueries();
+    queryClient.clear();
+    await supabase.auth.signOut();
+    navigate({ to: "/auth", replace: true });
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -160,6 +202,7 @@ function Index() {
         )} excl. btw`,
       });
       reset();
+      queryClient.invalidateQueries({ queryKey: ["my-quotes"] });
     } catch (err) {
       console.error(err);
       toast.error("Opslaan mislukt", {
@@ -175,17 +218,28 @@ function Index() {
       <Toaster position="top-right" richColors />
 
       <header className="border-b border-border bg-card">
-        <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-5 sm:px-6">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <Ruler className="h-5 w-5" />
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-5 sm:px-6">
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+              <Ruler className="h-5 w-5" />
+            </div>
+            <div>
+              <h1 className="text-lg font-semibold tracking-tight text-foreground">
+                Offertetool
+              </h1>
+              <p className="text-xs text-muted-foreground">
+                Ramen &amp; rolluiken — meerdere producten per offerte
+              </p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-lg font-semibold tracking-tight text-foreground">
-              Offertetool
-            </h1>
-            <p className="text-xs text-muted-foreground">
-              Ramen &amp; rolluiken — meerdere producten per offerte
-            </p>
+          <div className="flex items-center gap-3">
+            <span className="hidden text-xs text-muted-foreground sm:inline">
+              {session.user.email}
+            </span>
+            <Button variant="outline" size="sm" onClick={handleSignOut}>
+              <LogOut className="mr-2 h-4 w-4" />
+              Uitloggen
+            </Button>
           </div>
         </div>
       </header>
@@ -396,42 +450,6 @@ function Index() {
             </div>
           </section>
 
-          <section className="rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-8">
-            <h3 className="text-sm font-semibold text-foreground">Samenvatting</h3>
-            <ul className="mt-4 space-y-3 text-sm">
-              {items.map((it, idx) => {
-                const row = totals.rows[idx];
-                const hasDims = row && row.area > 0;
-                return (
-                  <li
-                    key={it.key}
-                    className="flex items-start justify-between gap-3 border-b border-border pb-3 last:border-none last:pb-0"
-                  >
-                    <div>
-                      <div className="font-medium text-foreground">
-                        {idx + 1}. {it.product_type === "raam" ? "Raam" : "Rolluik"}
-                      </div>
-                      <div className="mt-0.5 text-xs text-muted-foreground">
-                        {hasDims
-                          ? `${it.width_mm} × ${it.height_mm} mm · ${number.format(row!.area)} m²`
-                          : "afmetingen ontbreken"}
-                      </div>
-                    </div>
-                    <div className="whitespace-nowrap text-sm font-medium text-foreground">
-                      {hasDims ? currency.format(row!.total) : "—"}
-                    </div>
-                  </li>
-                );
-              })}
-              <li className="flex items-center justify-between pt-1 text-sm">
-                <span className="font-semibold text-foreground">Totaal excl. btw</span>
-                <span className="font-semibold text-foreground">
-                  {currency.format(totals.total)}
-                </span>
-              </li>
-            </ul>
-          </section>
-
           {lastQuoteNumber && (
             <section className="flex items-start gap-3 rounded-2xl border border-border bg-card p-5 shadow-sm">
               <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
@@ -443,6 +461,57 @@ function Index() {
               </div>
             </section>
           )}
+
+          <section className="rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-8">
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-foreground">Mijn offertes</h3>
+              {myQuotes.data && (
+                <span className="text-xs text-muted-foreground">
+                  {myQuotes.data.length}
+                </span>
+              )}
+            </div>
+            {myQuotes.isLoading ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" /> Laden…
+              </div>
+            ) : myQuotes.data && myQuotes.data.length > 0 ? (
+              <ul className="space-y-3 text-sm">
+                {myQuotes.data.map((q) => {
+                  const total = (q.quote_items ?? []).reduce(
+                    (s, it) => s + Number(it.total_ex_vat ?? 0),
+                    0,
+                  );
+                  return (
+                    <li
+                      key={q.id}
+                      className="flex items-start justify-between gap-3 border-b border-border pb-3 last:border-none last:pb-0"
+                    >
+                      <div>
+                        <div className="font-mono text-xs text-muted-foreground">
+                          {q.quote_number}
+                        </div>
+                        <div className="mt-0.5 font-medium text-foreground">
+                          {q.customer_name}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {(q.quote_items ?? []).length} product(en) ·{" "}
+                          {new Date(q.created_at).toLocaleDateString("nl-NL")}
+                        </div>
+                      </div>
+                      <div className="whitespace-nowrap font-medium text-foreground">
+                        {currency.format(total)}
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Nog geen offertes opgeslagen.
+              </p>
+            )}
+          </section>
         </aside>
       </main>
     </div>
