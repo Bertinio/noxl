@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { Loader2, Mail, Printer } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { getQuote, resendQuoteEmail } from "@/lib/noxl.functions";
+import { getQuote, resendQuoteEmail, getInstallerSettings } from "@/lib/noxl.functions";
 
 export const Route = createFileRoute("/_authenticated/quotes/$id/print")({
   head: () => ({ meta: [{ title: "Offerte — PDF" }] }),
@@ -17,11 +17,16 @@ const currency = new Intl.NumberFormat("nl-BE", { style: "currency", currency: "
 function QuotePrint() {
   const { id } = Route.useParams();
   const fetchQuote = useServerFn(getQuote);
+  const fetchSettings = useServerFn(getInstallerSettings);
   const resendFn = useServerFn(resendQuoteEmail);
   const [sending, setSending] = useState(false);
   const { data, isLoading } = useQuery({
     queryKey: ["quote", id],
     queryFn: () => fetchQuote({ data: { id } }),
+  });
+  const { data: settings } = useQuery({
+    queryKey: ["installer-settings"],
+    queryFn: () => fetchSettings(),
   });
 
   useEffect(() => {
@@ -65,9 +70,16 @@ function QuotePrint() {
               <p className="mt-1 text-sm">{q.quote_number}</p>
               <p className="text-sm">Datum: {new Date(q.created_at).toLocaleDateString("nl-BE")}</p>
             </div>
-            <div className="text-right">
-              <div className="text-lg font-bold">NoXL</div>
-              <div className="text-xs">Offerte-applicatie</div>
+            <div className="text-right text-sm">
+              {settings?.company && <div className="text-lg font-bold">{settings.company}</div>}
+              {settings?.name && <div>{settings.name}</div>}
+              {settings?.address && (
+                <div className="whitespace-pre-line">{settings.address}</div>
+              )}
+              {settings?.vat_number && <div>BTW: {settings.vat_number}</div>}
+              {!settings?.company && !settings?.name && !settings?.address && !settings?.vat_number && (
+                <div className="text-lg font-bold">NoXL</div>
+              )}
             </div>
           </div>
 

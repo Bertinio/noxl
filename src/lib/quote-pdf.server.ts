@@ -55,20 +55,30 @@ export async function generateQuotePdf(input: QuotePdfInput): Promise<Uint8Array
   // Header
   draw("OFFERTE", marginX, y, { size: 20, font: bold });
   const installer = input.installer ?? null;
-  const brand = installer?.company || installer?.name || "NoXL";
-  draw(brand, width - marginX - Math.min(brand.length * 7, 200), y, { size: 14, font: bold });
+
+  // Right-side company block (fallback: skip missing fields)
+  const rightLines: { text: string; size: number; font: typeof font; color: ReturnType<typeof rgb> }[] = [];
+  if (installer?.company) rightLines.push({ text: installer.company, size: 14, font: bold, color: black });
+  if (installer?.name) rightLines.push({ text: installer.name, size: 10, font, color: gray });
+  if (installer?.address) {
+    for (const line of installer.address.split("\n").map((l) => l.trim()).filter(Boolean)) {
+      rightLines.push({ text: line.slice(0, 60), size: 9, font, color: gray });
+    }
+  }
+  if (installer?.vat_number) rightLines.push({ text: `BTW: ${installer.vat_number}`, size: 9, font, color: gray });
+
+  let ry = y;
+  for (const l of rightLines) {
+    const w = l.font.widthOfTextAtSize(l.text, l.size);
+    draw(l.text, width - marginX - w, ry, { size: l.size, font: l.font, color: l.color });
+    ry -= l.size + 2;
+  }
+
   y -= 20;
   draw(input.quoteNumber, marginX, y, { size: 10, color: gray });
-  if (installer?.address) {
-    const line = installer.address.replace(/\n/g, " ").slice(0, 60);
-    draw(line, width - marginX - Math.min(line.length * 5, 260), y, { size: 8, color: gray });
-  }
   y -= 12;
-  if (installer?.vat_number) {
-    draw(`Btw: ${installer.vat_number}`, width - marginX - 120, y, { size: 8, color: gray });
-  }
   draw(`Datum: ${new Date(input.createdAt).toLocaleDateString("nl-BE")}`, marginX, y, { color: gray });
-  y -= 30;
+  y = Math.min(y - 18, ry - 10);
 
   // Customer
   if (input.customer) {
