@@ -115,22 +115,34 @@ export type Database = {
       }
       installer_settings: {
         Row: {
+          address: string | null
+          company: string | null
           created_at: string
+          name: string | null
           unit_price: number
           updated_at: string
           user_id: string
+          vat_number: string | null
         }
         Insert: {
+          address?: string | null
+          company?: string | null
           created_at?: string
+          name?: string | null
           unit_price?: number
           updated_at?: string
           user_id: string
+          vat_number?: string | null
         }
         Update: {
+          address?: string | null
+          company?: string | null
           created_at?: string
+          name?: string | null
           unit_price?: number
           updated_at?: string
           user_id?: string
+          vat_number?: string | null
         }
         Relationships: []
       }
@@ -422,7 +434,7 @@ export type Database = {
       }
     }
     Enums: {
-      app_role: "admin" | "customer"
+      app_role: "admin" | "customer" | "installer"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -550,7 +562,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "customer"],
+      app_role: ["admin", "customer", "installer"],
     },
   },
 } as const
