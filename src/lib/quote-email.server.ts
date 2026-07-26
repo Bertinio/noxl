@@ -12,7 +12,7 @@ export async function sendQuoteEmailWithSupabase(
   const { data: quote, error: qErr } = await supabase
     .from("project_quotes")
     .select(
-      "id, quote_number, total_price, created_at, project_id, projects(title, description, customers(name, email, company, address))",
+      "id, quote_number, total_price, created_at, project_id, projects(title, description, customers(name, email, company, address, owner_id))",
     )
     .eq("id", quote_id)
     .maybeSingle();
@@ -32,12 +32,30 @@ export async function sendQuoteEmailWithSupabase(
   const customer = Array.isArray(customerRaw) ? (customerRaw[0] ?? null) : customerRaw;
   if (!customer?.email) return { ok: false, reason: "Klant heeft geen e-mailadres" };
 
+  // Load the installer profile for the owner of this customer.
+  let installer: {
+    name: string | null;
+    company: string | null;
+    address: string | null;
+    vat_number: string | null;
+  } | null = null;
+  const ownerId = customer.owner_id ?? null;
+  if (ownerId) {
+    const { data: s } = await supabase
+      .from("installer_settings")
+      .select("name, company, address, vat_number")
+      .eq("user_id", ownerId)
+      .maybeSingle();
+    if (s) installer = s;
+  }
+
   const pdfBytes = await generateQuotePdf({
     quoteNumber: quote.quote_number,
     createdAt: quote.created_at,
     totalPrice: Number(quote.total_price),
     customer: customer ?? null,
     project: project ? { title: project.title, description: project.description } : null,
+    installer,
     items: (items ?? []).map((it) => ({
       description: it.description,
       quantity: it.quantity,
@@ -59,7 +77,11 @@ export async function sendQuoteEmailWithSupabase(
   if (!lovableApiKey || !resendKey) throw new Error("E-mailconfiguratie ontbreekt");
 
   const subject = `Uw offerte ${quote.quote_number} – NoXL`;
-  const signer = (installerName && installerName.trim()) || "Uw installateur";
+  const signer =
+    (installer?.company && installer.company.trim()) ||
+    (installer?.name && installer.name.trim()) ||
+    (installerName && installerName.trim()) ||
+    "Uw installateur";
   const projectTitle = project?.title ?? "";
   const html = `
     <div style="font-family: Arial, sans-serif; color:#111; line-height:1.5;">

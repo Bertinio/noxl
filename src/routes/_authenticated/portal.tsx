@@ -1,13 +1,14 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
+import { useEffect } from "react";
 import { Loader2, Download } from "lucide-react";
 import { AppShell } from "@/components/noxl/AppShell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { myPortalData } from "@/lib/noxl.functions";
+import { getMyRole, myPortalData } from "@/lib/noxl.functions";
 
 export const Route = createFileRoute("/_authenticated/portal")({
   head: () => ({ meta: [{ title: "Mijn portaal — NoXL" }] }),
@@ -18,10 +19,31 @@ const currency = new Intl.NumberFormat("nl-BE", { style: "currency", currency: "
 
 function Portal() {
   const navigate = useNavigate();
+  const fetchRole = useServerFn(getMyRole);
   const fetchPortal = useServerFn(myPortalData);
-  const { data, isLoading } = useQuery({ queryKey: ["portal"], queryFn: () => fetchPortal() });
+  const roleQuery = useQuery({ queryKey: ["my-role"], queryFn: () => fetchRole() });
+  const isCustomer = roleQuery.data?.role === "customer";
 
-  if (isLoading) return <div className="flex min-h-screen items-center justify-center"><Loader2 className="h-6 w-6 animate-spin" /></div>;
+  useEffect(() => {
+    if (roleQuery.data && !isCustomer) {
+      navigate({ to: "/dashboard", replace: true });
+    }
+  }, [roleQuery.data, isCustomer, navigate]);
+
+  const { data, isLoading } = useQuery({
+    queryKey: ["portal"],
+    queryFn: () => fetchPortal(),
+    enabled: isCustomer,
+  });
+
+  if (roleQuery.isLoading || (isCustomer && isLoading)) {
+    return <div className="flex min-h-screen items-center justify-center"><Loader2 className="h-6 w-6 animate-spin" /></div>;
+  }
+
+  if (!isCustomer) {
+    // Redirect in effect; render nothing to avoid flashing the customer profile message.
+    return <div className="flex min-h-screen items-center justify-center"><Loader2 className="h-6 w-6 animate-spin" /></div>;
+  }
 
   if (!data?.customer) {
     return (
