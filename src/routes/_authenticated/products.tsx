@@ -15,6 +15,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Toaster } from "@/components/ui/sonner";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { listProducts, createProduct, updateProduct, deleteProduct } from "@/lib/noxl.functions";
 import { ProductImportExport } from "@/components/noxl/ProductImportExport";
 
@@ -28,8 +29,13 @@ export const Route = createFileRoute("/_authenticated/products")({
 
 const currency = new Intl.NumberFormat("nl-BE", { style: "currency", currency: "EUR" });
 
-type Form = { id?: string; name: string; description: string; unit_price: number; category: string };
-const empty: Form = { name: "", description: "", unit_price: 0, category: "" };
+type Unit = "stuk" | "lengte" | "oppervlakte";
+const unitSuffix: Record<Unit, string> = { stuk: "/ stuk", lengte: "/ meter", oppervlakte: "/ m²" };
+const unitLabel: Record<Unit, string> = { stuk: "Stuk", lengte: "Lengte (per meter)", oppervlakte: "Oppervlakte (per m²)" };
+
+type Form = { id?: string; name: string; description: string; unit_price: number; category: string; unit: Unit };
+const empty: Form = { name: "", description: "", unit_price: 0, category: "", unit: "stuk" };
+
 
 function ProductsPage() {
   const qc = useQueryClient();
