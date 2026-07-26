@@ -602,6 +602,6 @@ export const removeUserRole = createServerFn({ method: "POST" })
       .delete()
       .eq("user_id", data.user_id)
       .eq("role", data.role);
-    if (error) throw new Error(error.message);
-    return { ok: true };
+    if (error) return { ok: false as const, message: error.message };
+    return { ok: true as const };
   });
