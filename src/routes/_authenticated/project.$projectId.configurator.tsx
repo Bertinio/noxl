@@ -128,64 +128,112 @@ export default function Configurator() {
   return (
     <AppShell role="admin" title="Configurator">
       <Toaster position="top-right" richColors />
-      <div className="mb-4 flex items-center justify-between">
-        <Button variant="ghost" size="sm" asChild>
+      {/* Terug + desktop-totaal */}
+      <div className="mb-4 flex flex-col gap-3 sm:mb-6 sm:flex-row sm:items-center sm:justify-between">
+        <Button variant="outline" asChild className="min-h-12 w-full justify-start sm:w-auto">
           <Link to="/projects/$id" params={{ id: projectId }}>
-            <ArrowLeft className="mr-1 h-4 w-4" /> Terug naar project
+            <ArrowLeft className="mr-2 h-5 w-5" /> Terug naar project
           </Link>
         </Button>
-        <div className="text-sm">Live totaal: <strong>{currency.format(grandTotal)}</strong></div>
+        <div className="hidden text-sm sm:block">Live totaal: <strong>{currency.format(grandTotal)}</strong></div>
       </div>
 
-      <div className="grid gap-6">
+      {/* Content — extra bottom padding op mobiel voor sticky bar */}
+      <div className="grid gap-4 pb-24 sm:gap-6 sm:pb-0">
         <Card>
-          <CardHeader><CardTitle>Project: {projectQ.data.project.title}</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="text-xl sm:text-lg">Project: {projectQ.data.project.title}</CardTitle></CardHeader>
           <CardContent className="text-sm text-muted-foreground">
             {projectQ.data.project.description ?? "Geen beschrijving"}
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader><CardTitle>Configuratieregels</CardTitle></CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Product</TableHead>
-                  <TableHead className="text-right">B (mm)</TableHead>
-                  <TableHead className="text-right">H (mm)</TableHead>
-                  <TableHead className="text-right">m²</TableHead>
-                  <TableHead className="text-right">Aantal</TableHead>
-                  <TableHead className="text-right">Prijs/m²</TableHead>
-                  <TableHead className="text-right">Totaal</TableHead>
-                  <TableHead />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {rows.map((r, i) => (
-                  <TableRow key={i}>
-                    <TableCell className="font-medium">{r.option_name}</TableCell>
-                    <TableCell className="text-right">{r.width_mm}</TableCell>
-                    <TableCell className="text-right">{r.height_mm}</TableCell>
-                    <TableCell className="text-right">{num.format(area(r))}</TableCell>
-                    <TableCell className="text-right">{r.quantity}</TableCell>
-                    <TableCell className="text-right">{currency.format(r.unit_price)}</TableCell>
-                    <TableCell className="text-right">{currency.format(lineTotal(r))}</TableCell>
-                    <TableCell className="text-right">
-                      <Button variant="ghost" size="icon" onClick={() => removeRule(i)}><Trash2 className="h-4 w-4" /></Button>
-                    </TableCell>
+          <CardHeader><CardTitle className="text-xl sm:text-lg">Configuratieregels</CardTitle></CardHeader>
+          <CardContent className="p-3 sm:p-6">
+            {/* Desktop tabel */}
+            <div className="hidden sm:block">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Product</TableHead>
+                    <TableHead className="text-right">B (mm)</TableHead>
+                    <TableHead className="text-right">H (mm)</TableHead>
+                    <TableHead className="text-right">m²</TableHead>
+                    <TableHead className="text-right">Aantal</TableHead>
+                    <TableHead className="text-right">Prijs/m²</TableHead>
+                    <TableHead className="text-right">Totaal</TableHead>
+                    <TableHead />
                   </TableRow>
-                ))}
-                {rows.length === 0 && (
-                  <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">Nog geen regels</TableCell></TableRow>
-                )}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {rows.map((r, i) => (
+                    <TableRow key={i}>
+                      <TableCell className="font-medium">{r.option_name}</TableCell>
+                      <TableCell className="text-right">{r.width_mm}</TableCell>
+                      <TableCell className="text-right">{r.height_mm}</TableCell>
+                      <TableCell className="text-right">{num.format(area(r))}</TableCell>
+                      <TableCell className="text-right">{r.quantity}</TableCell>
+                      <TableCell className="text-right">{currency.format(r.unit_price)}</TableCell>
+                      <TableCell className="text-right">{currency.format(lineTotal(r))}</TableCell>
+                      <TableCell className="text-right">
+                        <Button variant="ghost" size="icon" onClick={() => removeRule(i)}><Trash2 className="h-4 w-4" /></Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {rows.length === 0 && (
+                    <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">Nog geen regels</TableCell></TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+
+            {/* Mobiele kaarten */}
+            <div className="grid gap-3 sm:hidden">
+              {rows.map((r, i) => (
+                <div key={i} className="rounded-lg border bg-card p-4 shadow-sm">
+                  <div className="mb-3 flex items-start justify-between gap-2">
+                    <span className="font-semibold text-base truncate">{r.option_name}</span>
+                    <Button variant="ghost" size="icon" className="min-h-11 min-w-11 shrink-0" onClick={() => removeRule(i)}>
+                      <Trash2 className="h-5 w-5" />
+                    </Button>
+                  </div>
+                  <dl className="grid grid-cols-2 gap-3 text-sm">
+                    <div>
+                      <dt className="text-xs text-muted-foreground">Breedte</dt>
+                      <dd className="font-medium">{r.width_mm} mm</dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs text-muted-foreground">Hoogte</dt>
+                      <dd className="font-medium">{r.height_mm} mm</dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs text-muted-foreground">Oppervlakte</dt>
+                      <dd className="font-medium">{num.format(area(r))} m²</dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs text-muted-foreground">Aantal</dt>
+                      <dd className="font-medium">{r.quantity}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs text-muted-foreground">Prijs/m²</dt>
+                      <dd className="font-medium">{currency.format(r.unit_price)}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs text-muted-foreground">Totaal</dt>
+                      <dd className="font-semibold text-primary">{currency.format(lineTotal(r))}</dd>
+                    </div>
+                  </dl>
+                </div>
+              ))}
+              {rows.length === 0 && (
+                <div className="text-center text-muted-foreground py-8">Nog geen regels</div>
+              )}
+            </div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader><CardTitle>Nieuwe regel toevoegen</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="text-xl sm:text-lg">Nieuwe regel toevoegen</CardTitle></CardHeader>
           <CardContent>
             {products.length === 0 ? (
               <p className="text-sm text-muted-foreground">
@@ -194,9 +242,9 @@ export default function Configurator() {
             ) : (
               <div className="grid gap-3">
                 <div className="grid gap-1.5">
-                  <label className="text-xs text-muted-foreground">Product</label>
+                  <label className="text-sm text-muted-foreground">Product</label>
                   <Select value={newRow.product_id} onValueChange={pickProduct}>
-                    <SelectTrigger><SelectValue placeholder="Kies een product" /></SelectTrigger>
+                    <SelectTrigger className="min-h-11"><SelectValue placeholder="Kies een product" /></SelectTrigger>
                     <SelectContent>
                       {products.map((p) => (
                         <SelectItem key={p.id} value={p.id}>
@@ -206,43 +254,51 @@ export default function Configurator() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="grid grid-cols-[1fr_120px_120px_90px_auto] gap-2 items-end">
+                <div className="grid gap-3 sm:grid-cols-[1fr_120px_120px_90px_auto] sm:items-end">
                   <div className="grid gap-1.5">
-                    <label className="text-xs text-muted-foreground">Beschrijving</label>
-                    <Input value={newRow.option_value} onChange={(e) => setNewRow({ ...newRow, option_value: e.target.value })} placeholder="Optioneel" />
+                    <label className="text-sm text-muted-foreground">Beschrijving</label>
+                    <Input value={newRow.option_value} onChange={(e) => setNewRow({ ...newRow, option_value: e.target.value })} placeholder="Optioneel" className="min-h-11" />
                   </div>
                   <div className="grid gap-1.5">
-                    <label className="text-xs text-muted-foreground">Breedte (mm)</label>
+                    <label className="text-sm text-muted-foreground">Breedte (mm)</label>
                     <Input type="number" min={0} value={newRow.width_mm || ""}
                       onChange={(e) => setNewRow({ ...newRow, width_mm: Number(e.target.value) || 0 })}
-                      className="text-right" />
+                      className="min-h-11 text-right" />
                   </div>
                   <div className="grid gap-1.5">
-                    <label className="text-xs text-muted-foreground">Hoogte (mm)</label>
+                    <label className="text-sm text-muted-foreground">Hoogte (mm)</label>
                     <Input type="number" min={0} value={newRow.height_mm || ""}
                       onChange={(e) => setNewRow({ ...newRow, height_mm: Number(e.target.value) || 0 })}
-                      className="text-right" />
+                      className="min-h-11 text-right" />
                   </div>
                   <div className="grid gap-1.5">
-                    <label className="text-xs text-muted-foreground">Aantal</label>
+                    <label className="text-sm text-muted-foreground">Aantal</label>
                     <Input type="number" min={1} value={newRow.quantity}
                       onChange={(e) => setNewRow({ ...newRow, quantity: Number(e.target.value) || 0 })}
-                      className="text-right" />
+                      className="min-h-11 text-right" />
                   </div>
-                  <Button onClick={addRule} disabled={saveMut.isPending || !newRow.product_id}>
+                  <Button onClick={addRule} disabled={saveMut.isPending || !newRow.product_id} className="min-h-12 w-full sm:w-auto">
                     {saveMut.isPending ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Plus className="mr-1 h-4 w-4" />}
                     Toevoegen
                   </Button>
                 </div>
-                <div className="grid grid-cols-3 gap-2 text-sm rounded-md bg-muted/40 p-3">
+                <div className="grid grid-cols-1 gap-2 rounded-md bg-muted/40 p-3 text-sm sm:grid-cols-3">
                   <div>Oppervlakte: <strong>{num.format(area(newRow))} m²</strong></div>
                   <div>Prijs/m²: <strong>{currency.format(newRow.unit_price)}</strong></div>
-                  <div className="text-right">Regeltotaal: <strong>{currency.format(lineTotal(newRow))}</strong></div>
+                  <div className="sm:text-right">Regeltotaal: <strong>{currency.format(lineTotal(newRow))}</strong></div>
                 </div>
               </div>
             )}
           </CardContent>
         </Card>
+      </div>
+
+      {/* Sticky totaalbalk — alleen mobiel */}
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t bg-background px-4 py-3 shadow-[0_-4px_16px_-4px_rgba(0,0,0,0.15)] sm:hidden">
+        <div className="flex items-center justify-between">
+          <span className="text-sm text-muted-foreground">Totaal</span>
+          <span className="text-xl font-bold text-primary">{currency.format(grandTotal)}</span>
+        </div>
       </div>
     </AppShell>
   );
