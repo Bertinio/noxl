@@ -155,7 +155,7 @@ export const getProject = createServerFn({ method: "GET" })
     const customer = one(project.customers);
     const { data: configs } = await context.supabase
       .from("configurations")
-      .select("id, option_name, option_value, quantity, unit_price, total_price, product_id, width_mm, height_mm, area_m2, created_at")
+      .select("id, option_name, option_value, quantity, unit_price, total_price, product_id, width_mm, height_mm, area_m2, unit, created_at")
       .eq("project_id", data.id)
       .order("created_at", { ascending: true });
     const { data: quotes } = await context.supabase
