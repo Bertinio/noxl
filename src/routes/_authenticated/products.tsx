@@ -16,6 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Toaster } from "@/components/ui/sonner";
 import { listProducts, createProduct, updateProduct, deleteProduct } from "@/lib/noxl.functions";
+import { ProductImportExport } from "@/components/noxl/ProductImportExport";
 
 export const Route = createFileRoute("/_authenticated/products")({
   head: () => ({ meta: [
