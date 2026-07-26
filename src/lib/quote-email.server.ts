@@ -26,9 +26,10 @@ export async function sendQuoteEmailWithSupabase(
     .order("created_at", { ascending: true });
   if (iErr) throw new Error(iErr.message);
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const project = (quote as any).projects;
-  const customer = project?.customers;
+  const projectRaw = quote.projects;
+  const project = Array.isArray(projectRaw) ? (projectRaw[0] ?? null) : projectRaw;
+  const customerRaw = project?.customers;
+  const customer = Array.isArray(customerRaw) ? (customerRaw[0] ?? null) : customerRaw;
   if (!customer?.email) return { ok: false, reason: "Klant heeft geen e-mailadres" };
 
   const pdfBytes = await generateQuotePdf({
