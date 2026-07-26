@@ -26,6 +26,7 @@ export type Database = {
           project_id: string
           quantity: number
           total_price: number
+          unit: string
           unit_price: number
           width_mm: number | null
         }
@@ -40,6 +41,7 @@ export type Database = {
           project_id: string
           quantity?: number
           total_price?: number
+          unit?: string
           unit_price?: number
           width_mm?: number | null
         }
@@ -54,6 +56,7 @@ export type Database = {
           project_id?: string
           quantity?: number
           total_price?: number
+          unit?: string
           unit_price?: number
           width_mm?: number | null
         }
@@ -139,6 +142,7 @@ export type Database = {
           id: string
           name: string
           owner_id: string
+          unit: string
           unit_price: number
           updated_at: string
         }
@@ -149,6 +153,7 @@ export type Database = {
           id?: string
           name: string
           owner_id?: string
+          unit?: string
           unit_price?: number
           updated_at?: string
         }
@@ -159,6 +164,7 @@ export type Database = {
           id?: string
           name?: string
           owner_id?: string
+          unit?: string
           unit_price?: number
           updated_at?: string
         }
@@ -175,6 +181,7 @@ export type Database = {
           quantity: number
           quote_id: string
           total_price: number
+          unit: string
           unit_price: number
           width_mm: number | null
         }
@@ -188,6 +195,7 @@ export type Database = {
           quantity?: number
           quote_id: string
           total_price?: number
+          unit?: string
           unit_price?: number
           width_mm?: number | null
         }
@@ -201,6 +209,7 @@ export type Database = {
           quantity?: number
           quote_id?: string
           total_price?: number
+          unit?: string
           unit_price?: number
           width_mm?: number | null
         }
