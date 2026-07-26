@@ -367,7 +367,22 @@ export const generateQuote = createServerFn({ method: "POST" })
     const { error: iErr } = await supabase.from("project_quote_items").insert(items);
     if (iErr) throw new Error(iErr.message);
 
-    return { id: quote.id, quote_number: quote.quote_number };
+    // Send quote email to customer
+    let emailSent = false;
+    let emailError: string | null = null;
+    try {
+      const { sendQuoteEmailWithSupabase } = await import("./quote-email.server");
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const installerName = (context.claims as any)?.email ?? null;
+      const result = await sendQuoteEmailWithSupabase(supabase, quote.id, installerName);
+      if (result.ok) emailSent = true;
+      else emailError = result.reason;
+    } catch (e) {
+      emailError = (e as Error).message;
+      console.error("[generateQuote] email failed", emailError);
+    }
+
+    return { id: quote.id, quote_number: quote.quote_number, emailSent, emailError };
   });
 
 export const getQuote = createServerFn({ method: "GET" })
