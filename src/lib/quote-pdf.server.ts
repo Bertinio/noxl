@@ -97,12 +97,13 @@ export async function generateQuotePdf(input: QuotePdfInput): Promise<Uint8Array
   }
 
   // Table header
-  const colX = { desc: marginX, qty: 340, price: 400, total: 490 };
+  const colX = { desc: marginX, qty: 300, price: 410, total: 500 };
   page.drawLine({ start: { x: marginX, y: y + 4 }, end: { x: width - marginX, y: y + 4 }, thickness: 1.5, color: black });
   draw("Omschrijving", colX.desc, y - 10, { font: bold, size: 9 });
-  draw("Aantal", colX.qty, y - 10, { font: bold, size: 9 });
-  draw("Prijs/stuk", colX.price, y - 10, { font: bold, size: 9 });
+  draw("Hoeveelheid", colX.qty, y - 10, { font: bold, size: 9 });
+  draw("Prijs", colX.price, y - 10, { font: bold, size: 9 });
   draw("Totaal", colX.total, y - 10, { font: bold, size: 9 });
+
   y -= 16;
   page.drawLine({ start: { x: marginX, y: y - 2 }, end: { x: width - marginX, y: y - 2 }, thickness: 0.5, color: black });
   y -= 12;
