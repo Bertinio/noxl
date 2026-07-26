@@ -1,7 +1,9 @@
 import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
-import { LayoutDashboard, Users, FolderKanban, LogOut, FileText, Home, Package, ShieldCheck } from "lucide-react";
+import { LayoutDashboard, Users, FolderKanban, LogOut, FileText, Home, Package, ShieldCheck, Settings } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { getMyRole } from "@/lib/noxl.functions";
 import {
   Sidebar,
   SidebarContent,
@@ -22,10 +24,14 @@ import type { ComponentType, ReactNode } from "react";
 
 type NavItem = { title: string; url: string; icon: ComponentType<{ className?: string }> };
 
-const adminNav: NavItem[] = [
+const installerNav: NavItem[] = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
   { title: "Klanten", url: "/dashboard", icon: Users },
   { title: "Producten", url: "/products", icon: Package },
+  { title: "Instellingen", url: "/instellingen", icon: Settings },
+];
+
+const adminExtraNav: NavItem[] = [
   { title: "Beheer", url: "/admin", icon: ShieldCheck },
 ];
 
@@ -34,10 +40,17 @@ const portalNav: NavItem[] = [
 ];
 
 export function AppShell({ role, children, title }: { role: "admin" | "customer"; children: ReactNode; title?: string }) {
-  const nav = role === "admin" ? adminNav : portalNav;
   const currentPath = useRouterState({ select: (r) => r.location.pathname });
   const navigate = useNavigate();
   const qc = useQueryClient();
+  const fetchRole = useServerFn(getMyRole);
+  const roleQuery = useQuery({
+    queryKey: ["my-role"],
+    queryFn: () => fetchRole(),
+    enabled: role === "admin",
+  });
+  const isAdmin = roleQuery.data?.role === "admin";
+  const nav = role === "admin" ? [...installerNav, ...(isAdmin ? adminExtraNav : [])] : portalNav;
 
   async function handleSignOut() {
     await qc.cancelQueries();
@@ -85,7 +98,7 @@ export function AppShell({ role, children, title }: { role: "admin" | "customer"
           <header className="h-14 flex items-center gap-3 border-b bg-background px-4 sticky top-0 z-30">
             <SidebarTrigger className="min-h-11 min-w-11" />
             {title ? <h1 className="text-lg sm:text-base font-semibold truncate">{title}</h1> : null}
-            {role === "admin" ? (
+            {role === "admin" && isAdmin ? (
               <Badge variant="secondary" className="ml-auto gap-1">
                 <ShieldCheck className="h-3 w-3" /> Admin
               </Badge>
