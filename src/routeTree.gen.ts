@@ -14,6 +14,7 @@ import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
 import { Route as AuthenticatedProductsRouteImport } from './routes/_authenticated/products'
 import { Route as AuthenticatedPortalRouteImport } from './routes/_authenticated/portal'
+import { Route as AuthenticatedInstellingenRouteImport } from './routes/_authenticated/instellingen'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as AuthenticatedProjectsIdRouteImport } from './routes/_authenticated/projects.$id'
@@ -47,6 +48,12 @@ const AuthenticatedPortalRoute = AuthenticatedPortalRouteImport.update({
   path: '/portal',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedInstellingenRoute =
+  AuthenticatedInstellingenRouteImport.update({
+    id: '/instellingen',
+    path: '/instellingen',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
@@ -98,6 +105,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/admin': typeof AuthenticatedAdminRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/instellingen': typeof AuthenticatedInstellingenRoute
   '/portal': typeof AuthenticatedPortalRoute
   '/products': typeof AuthenticatedProductsRoute
   '/customers/$id': typeof AuthenticatedCustomersIdRoute
@@ -111,6 +119,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/admin': typeof AuthenticatedAdminRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/instellingen': typeof AuthenticatedInstellingenRoute
   '/portal': typeof AuthenticatedPortalRoute
   '/products': typeof AuthenticatedProductsRoute
   '/': typeof AuthenticatedIndexRoute
@@ -127,6 +136,7 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
+  '/_authenticated/instellingen': typeof AuthenticatedInstellingenRoute
   '/_authenticated/portal': typeof AuthenticatedPortalRoute
   '/_authenticated/products': typeof AuthenticatedProductsRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
@@ -144,6 +154,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/admin'
     | '/dashboard'
+    | '/instellingen'
     | '/portal'
     | '/products'
     | '/customers/$id'
@@ -157,6 +168,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/admin'
     | '/dashboard'
+    | '/instellingen'
     | '/portal'
     | '/products'
     | '/'
@@ -172,6 +184,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/_authenticated/admin'
     | '/_authenticated/dashboard'
+    | '/_authenticated/instellingen'
     | '/_authenticated/portal'
     | '/_authenticated/products'
     | '/_authenticated/'
@@ -223,6 +236,13 @@ declare module '@tanstack/react-router' {
       path: '/portal'
       fullPath: '/portal'
       preLoaderRoute: typeof AuthenticatedPortalRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/instellingen': {
+      id: '/_authenticated/instellingen'
+      path: '/instellingen'
+      fullPath: '/instellingen'
+      preLoaderRoute: typeof AuthenticatedInstellingenRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/dashboard': {
@@ -304,6 +324,7 @@ const AuthenticatedProjectsIdRouteWithChildren =
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAdminRoute: typeof AuthenticatedAdminRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
+  AuthenticatedInstellingenRoute: typeof AuthenticatedInstellingenRoute
   AuthenticatedPortalRoute: typeof AuthenticatedPortalRoute
   AuthenticatedProductsRoute: typeof AuthenticatedProductsRoute
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
@@ -316,6 +337,7 @@ interface AuthenticatedRouteRouteChildren {
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAdminRoute: AuthenticatedAdminRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
+  AuthenticatedInstellingenRoute: AuthenticatedInstellingenRoute,
   AuthenticatedPortalRoute: AuthenticatedPortalRoute,
   AuthenticatedProductsRoute: AuthenticatedProductsRoute,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
