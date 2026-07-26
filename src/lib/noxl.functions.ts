@@ -593,7 +593,7 @@ export const removeUserRole = createServerFn({ method: "POST" })
         .select("user_id", { count: "exact", head: true })
         .eq("role", "admin");
       if ((count ?? 0) <= 1) {
-        throw new Error("Kan de laatste beheerder niet verwijderen");
+        return { ok: false as const, message: "Kan de laatste beheerder niet verwijderen" };
       }
     }
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
