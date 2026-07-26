@@ -12,23 +12,28 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { importProducts, listProducts } from "@/lib/noxl.functions";
 
+type Unit = "stuk" | "lengte" | "oppervlakte";
 type ParsedRow = {
   name: string;
   description: string | null;
   unit_price: number;
   category: string | null;
+  unit: Unit;
 };
 type PreviewRow = { row: number; data?: ParsedRow; errors: string[] };
 
+const ALLOWED_UNITS: Unit[] = ["stuk", "lengte", "oppervlakte"];
+
 function normalizeRows(raw: Record<string, unknown>[]): PreviewRow[] {
   return raw.map((r, i) => {
-    // Case-insensitive key lookup
     const keys: Record<string, unknown> = {};
     for (const k of Object.keys(r)) keys[k.toLowerCase().trim()] = r[k];
     const name = String(keys["name"] ?? "").trim();
     const description = keys["description"] != null ? String(keys["description"]).trim() : "";
     const priceRaw = keys["unit_price"];
     const category = keys["category"] != null ? String(keys["category"]).trim() : "";
+    const unitRaw = keys["unit"] != null ? String(keys["unit"]).trim().toLowerCase() : "";
+    const unit: Unit = (ALLOWED_UNITS.includes(unitRaw as Unit) ? unitRaw : "stuk") as Unit;
     const errors: string[] = [];
     if (!name) errors.push("name is verplicht");
     const priceNum = typeof priceRaw === "number"
@@ -36,15 +41,17 @@ function normalizeRows(raw: Record<string, unknown>[]): PreviewRow[] {
       : Number(String(priceRaw ?? "").replace(",", "."));
     if (!Number.isFinite(priceNum) || priceNum < 0) errors.push("unit_price ongeldig");
     if (name.length > 200) errors.push("name te lang");
+    if (unitRaw && !ALLOWED_UNITS.includes(unitRaw as Unit)) errors.push("unit ongeldig (stuk/lengte/oppervlakte)");
     return {
-      row: i + 2, // +1 header, +1 1-indexed
+      row: i + 2,
       data: errors.length === 0
-        ? { name, description: description || null, unit_price: priceNum, category: category || null }
+        ? { name, description: description || null, unit_price: priceNum, category: category || null, unit }
         : undefined,
       errors,
     };
   });
 }
+
 
 export function ProductImportExport() {
   const qc = useQueryClient();
@@ -99,16 +106,17 @@ export function ProductImportExport() {
       description: p.description ?? "",
       unit_price: Number(p.unit_price) || 0,
       category: p.category ?? "",
+      unit: (p.unit ?? "stuk") as Unit,
     }));
   }
+
+  const EXPORT_COLS = ["name", "description", "unit_price", "category", "unit"];
 
   async function exportXlsx() {
     setExporting("xlsx");
     try {
       const rows = await fetchAll();
-      const ws = XLSX.utils.json_to_sheet(rows, {
-        header: ["name", "description", "unit_price", "category"],
-      });
+      const ws = XLSX.utils.json_to_sheet(rows, { header: EXPORT_COLS });
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Producten");
       XLSX.writeFile(wb, `producten-${new Date().toISOString().slice(0, 10)}.xlsx`);
@@ -124,7 +132,7 @@ export function ProductImportExport() {
     setExporting("csv");
     try {
       const rows = await fetchAll();
-      const csv = Papa.unparse(rows, { columns: ["name", "description", "unit_price", "category"] });
+      const csv = Papa.unparse(rows, { columns: EXPORT_COLS });
       const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -139,6 +147,7 @@ export function ProductImportExport() {
       setExporting(null);
     }
   }
+
 
   const validRows = (preview ?? []).filter((r) => r.data).map((r) => r.data!) as ParsedRow[];
   const errorCount = (preview ?? []).filter((r) => r.errors.length > 0).length;
@@ -192,7 +201,8 @@ export function ProductImportExport() {
                   <TableHead className="w-14">Rij</TableHead>
                   <TableHead>Naam</TableHead>
                   <TableHead>Categorie</TableHead>
-                  <TableHead className="text-right">Prijs/m²</TableHead>
+                  <TableHead>Eenheid</TableHead>
+                  <TableHead className="text-right">Prijs</TableHead>
                   <TableHead>Beschrijving</TableHead>
                   <TableHead>Status</TableHead>
                 </TableRow>
@@ -203,11 +213,13 @@ export function ProductImportExport() {
                     <TableCell>{r.row}</TableCell>
                     <TableCell>{r.data?.name ?? "—"}</TableCell>
                     <TableCell>{r.data?.category ?? "—"}</TableCell>
+                    <TableCell>{r.data?.unit ?? "—"}</TableCell>
                     <TableCell className="text-right">
                       {r.data ? r.data.unit_price.toFixed(2) : "—"}
                     </TableCell>
                     <TableCell className="max-w-xs truncate">{r.data?.description ?? "—"}</TableCell>
                     <TableCell>
+
                       {r.errors.length === 0
                         ? <span className="text-emerald-600">OK</span>
                         : <span className="text-destructive">{r.errors.join(", ")}</span>}

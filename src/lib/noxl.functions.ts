@@ -155,7 +155,7 @@ export const getProject = createServerFn({ method: "GET" })
     const customer = one(project.customers);
     const { data: configs } = await context.supabase
       .from("configurations")
-      .select("id, option_name, option_value, quantity, unit_price, total_price, product_id, width_mm, height_mm, area_m2, created_at")
+      .select("id, option_name, option_value, quantity, unit_price, total_price, product_id, width_mm, height_mm, area_m2, unit, created_at")
       .eq("project_id", data.id)
       .order("created_at", { ascending: true });
     const { data: quotes } = await context.supabase
@@ -203,11 +203,15 @@ export const createProject = createServerFn({ method: "POST" })
   });
 
 // ---------- products ----------
+const unitSchema = z.enum(["stuk", "lengte", "oppervlakte"]);
+export type ProductUnit = z.infer<typeof unitSchema>;
+
 const productInputSchema = z.object({
   name: z.string().trim().min(1).max(200),
   description: z.string().trim().max(2000).optional().nullable(),
   unit_price: z.number().min(0).max(1_000_000),
   category: z.string().trim().max(100).optional().nullable(),
+  unit: unitSchema.default("stuk"),
 });
 
 export const listProducts = createServerFn({ method: "GET" })
@@ -215,7 +219,7 @@ export const listProducts = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const { data, error } = await context.supabase
       .from("products")
-      .select("id, name, description, unit_price, category, created_at")
+      .select("id, name, description, unit_price, category, unit, created_at")
       .order("created_at", { ascending: false });
     if (error) throw new Error(error.message);
     return data ?? [];
@@ -233,6 +237,7 @@ export const createProduct = createServerFn({ method: "POST" })
         description: data.description ?? null,
         unit_price: data.unit_price,
         category: data.category ?? null,
+        unit: data.unit,
       })
       .select("id")
       .single();
@@ -253,6 +258,7 @@ export const updateProduct = createServerFn({ method: "POST" })
         description: data.description ?? null,
         unit_price: data.unit_price,
         category: data.category ?? null,
+        unit: data.unit,
       })
       .eq("id", data.id);
     if (error) throw new Error(error.message);
@@ -274,6 +280,7 @@ const importRowSchema = z.object({
   description: z.string().trim().max(2000).optional().nullable(),
   unit_price: z.number().min(0).max(1_000_000),
   category: z.string().trim().max(100).optional().nullable(),
+  unit: unitSchema.default("stuk"),
 });
 
 export const importProducts = createServerFn({ method: "POST" })
@@ -288,6 +295,7 @@ export const importProducts = createServerFn({ method: "POST" })
       description: r.description ?? null,
       unit_price: r.unit_price,
       category: r.category ?? null,
+      unit: r.unit,
     }));
     const { error } = await context.supabase
       .from("products")
@@ -295,6 +303,7 @@ export const importProducts = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { ok: true, count: payload.length };
   });
+
 
 // ---------- configurations ----------
 const configItemSchema = z.object({
@@ -304,9 +313,29 @@ const configItemSchema = z.object({
   option_value: z.string().trim().max(500).optional().nullable(),
   width_mm: z.number().min(0).max(100000),
   height_mm: z.number().min(0).max(100000),
-  quantity: z.number().int().min(0).max(100000),
+  quantity: z.number().min(0).max(100000),
   unit_price: z.number().min(0).max(1_000_000),
+  unit: unitSchema.default("stuk"),
 });
+
+function computeLineTotal(it: {
+  unit: ProductUnit;
+  width_mm: number;
+  height_mm: number;
+  quantity: number;
+  unit_price: number;
+}) {
+  const qty = it.quantity || 0;
+  if (it.unit === "oppervlakte") {
+    const area = (it.width_mm * it.height_mm) / 1_000_000;
+    return area * it.unit_price * qty;
+  }
+  if (it.unit === "lengte") {
+    const len = it.width_mm / 1000;
+    return len * it.unit_price * qty;
+  }
+  return qty * it.unit_price;
+}
 
 export const saveConfigurations = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -324,11 +353,10 @@ export const saveConfigurations = createServerFn({ method: "POST" })
       .eq("project_id", data.project_id);
     if (delErr) throw new Error(delErr.message);
 
-    const computed = data.items.map((it) => {
-      const area = (it.width_mm * it.height_mm) / 1_000_000;
-      const line = area * it.unit_price * it.quantity;
-      return { it, area, line: Number(line.toFixed(2)) };
-    });
+    const computed = data.items.map((it) => ({
+      it,
+      line: Number(computeLineTotal(it).toFixed(2)),
+    }));
 
     if (computed.length > 0) {
       const payload = computed.map(({ it, line }) => ({
@@ -341,10 +369,12 @@ export const saveConfigurations = createServerFn({ method: "POST" })
         quantity: it.quantity,
         unit_price: it.unit_price,
         total_price: line,
+        unit: it.unit,
       }));
       const { error: insErr } = await supabase.from("configurations").insert(payload);
       if (insErr) throw new Error(insErr.message);
     }
+
 
     const total = computed.reduce((s, c) => s + c.line, 0);
     const status = computed.length > 0 ? "configured" : "draft";
@@ -365,7 +395,7 @@ export const generateQuote = createServerFn({ method: "POST" })
     const { supabase } = context;
     const { data: configs, error: cErr } = await supabase
       .from("configurations")
-      .select("option_name, option_value, quantity, unit_price, total_price, product_id, width_mm, height_mm")
+      .select("option_name, option_value, quantity, unit_price, total_price, product_id, width_mm, height_mm, unit")
       .eq("project_id", data.project_id);
     if (cErr) throw new Error(cErr.message);
     if (!configs || configs.length === 0) throw new Error("Voeg eerst configuratieregels toe");
@@ -394,9 +424,11 @@ export const generateQuote = createServerFn({ method: "POST" })
       quantity: c.quantity,
       unit_price: Number(c.unit_price),
       total_price: Number(c.total_price ?? 0),
+      unit: c.unit ?? "stuk",
     }));
     const { error: iErr } = await supabase.from("project_quote_items").insert(items);
     if (iErr) throw new Error(iErr.message);
+
 
     // Send quote email to customer
     let emailSent = false;

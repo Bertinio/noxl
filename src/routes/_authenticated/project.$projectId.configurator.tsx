@@ -21,22 +21,43 @@ export const Route = createFileRoute("/_authenticated/project/$projectId/configu
 const currency = new Intl.NumberFormat("nl-BE", { style: "currency", currency: "EUR" });
 const num = new Intl.NumberFormat("nl-BE", { maximumFractionDigits: 3 });
 
+type Unit = "stuk" | "lengte" | "oppervlakte";
+const unitSuffix: Record<Unit, string> = { stuk: "/ stuk", lengte: "/ meter", oppervlakte: "/ m²" };
+
 type Row = {
   product_id: string;
   option_name: string;
   option_value: string;
-  width_mm: number;
-  height_mm: number;
+  width_mm: number;  // for lengte: length in mm; for oppervlakte: breedte in mm
+  height_mm: number; // only for oppervlakte: hoogte in mm
   quantity: number;
-  unit_price: number; // per m²
+  unit_price: number;
+  unit: Unit;
 };
 
 function emptyRow(): Row {
-  return { product_id: "", option_name: "", option_value: "", width_mm: 0, height_mm: 0, quantity: 1, unit_price: 0 };
+  return { product_id: "", option_name: "", option_value: "", width_mm: 0, height_mm: 0, quantity: 1, unit_price: 0, unit: "stuk" };
 }
 
-function area(r: Row) { return (r.width_mm * r.height_mm) / 1_000_000; }
-function lineTotal(r: Row) { return area(r) * r.unit_price * r.quantity; }
+function lineTotal(r: Row) {
+  const qty = r.quantity || 0;
+  if (r.unit === "oppervlakte") {
+    return ((r.width_mm * r.height_mm) / 1_000_000) * r.unit_price * qty;
+  }
+  if (r.unit === "lengte") {
+    return (r.width_mm / 1000) * r.unit_price * qty;
+  }
+  return qty * r.unit_price;
+}
+
+function metrics(r: Row): string {
+  if (r.unit === "oppervlakte") {
+    const a = (r.width_mm * r.height_mm) / 1_000_000;
+    return `${num.format(a)} m²`;
+  }
+  if (r.unit === "lengte") return `${num.format(r.width_mm / 1000)} m`;
+  return `${r.quantity} stuk${r.quantity === 1 ? "" : "s"}`;
+}
 
 export default function Configurator() {
   const { projectId } = Route.useParams();
@@ -58,15 +79,19 @@ export default function Configurator() {
       setRows(
         projectQ.data.configurations
           .filter((c) => c.product_id)
-          .map((c) => ({
-            product_id: c.product_id as string,
-            option_name: c.option_name,
-            option_value: c.option_value ?? "",
-            width_mm: Number(c.width_mm) || 0,
-            height_mm: Number(c.height_mm) || 0,
-            quantity: c.quantity,
-            unit_price: Number(c.unit_price),
-          })),
+          .map((c) => {
+            const u = (c.unit ?? "stuk") as Unit;
+            return {
+              product_id: c.product_id as string,
+              option_name: c.option_name,
+              option_value: c.option_value ?? "",
+              width_mm: Number(c.width_mm) || 0,
+              height_mm: Number(c.height_mm) || 0,
+              quantity: c.quantity,
+              unit_price: Number(c.unit_price),
+              unit: (["stuk", "lengte", "oppervlakte"].includes(u) ? u : "stuk") as Unit,
+            };
+          }),
       );
     }
   }, [projectQ.data]);
@@ -87,6 +112,7 @@ export default function Configurator() {
             height_mm: r.height_mm,
             quantity: r.quantity,
             unit_price: r.unit_price,
+            unit: r.unit,
           })),
         },
       }),
@@ -97,18 +123,30 @@ export default function Configurator() {
   function pickProduct(productId: string) {
     const p = (productsQ.data ?? []).find((x) => x.id === productId);
     if (!p) return;
+    const u = ((p.unit ?? "stuk") as Unit);
+    const unit = (["stuk", "lengte", "oppervlakte"].includes(u) ? u : "stuk") as Unit;
     setNewRow({
       ...newRow,
       product_id: p.id,
       option_name: p.name,
       option_value: p.description ?? "",
       unit_price: Number(p.unit_price) || 0,
+      unit,
+      width_mm: 0,
+      height_mm: 0,
+      quantity: 1,
     });
   }
 
   function addRule() {
     if (!newRow.product_id) { toast.error("Kies een product"); return; }
-    if (newRow.width_mm <= 0 || newRow.height_mm <= 0) { toast.error("Vul breedte en hoogte in"); return; }
+    if (newRow.unit === "oppervlakte" && (newRow.width_mm <= 0 || newRow.height_mm <= 0)) {
+      toast.error("Vul breedte en hoogte in"); return;
+    }
+    if (newRow.unit === "lengte" && newRow.width_mm <= 0) {
+      toast.error("Vul de lengte in"); return;
+    }
+    if (newRow.quantity <= 0) { toast.error("Aantal moet groter zijn dan 0"); return; }
     const next = [...rows, newRow];
     setRows(next);
     setNewRow(emptyRow());
@@ -128,7 +166,6 @@ export default function Configurator() {
   return (
     <AppShell role="admin" title="Configurator">
       <Toaster position="top-right" richColors />
-      {/* Terug + desktop-totaal */}
       <div className="mb-4 flex flex-col gap-3 sm:mb-6 sm:flex-row sm:items-center sm:justify-between">
         <Button variant="outline" asChild className="min-h-12 w-full justify-start sm:w-auto">
           <Link to="/projects/$id" params={{ id: projectId }}>
@@ -138,7 +175,6 @@ export default function Configurator() {
         <div className="hidden text-sm sm:block">Live totaal: <strong>{currency.format(grandTotal)}</strong></div>
       </div>
 
-      {/* Content — extra bottom padding op mobiel voor sticky bar */}
       <div className="grid gap-4 pb-24 sm:gap-6 sm:pb-0">
         <Card>
           <CardHeader><CardTitle className="text-xl sm:text-lg">Project: {projectQ.data.project.title}</CardTitle></CardHeader>
@@ -150,17 +186,14 @@ export default function Configurator() {
         <Card>
           <CardHeader><CardTitle className="text-xl sm:text-lg">Configuratieregels</CardTitle></CardHeader>
           <CardContent className="p-3 sm:p-6">
-            {/* Desktop tabel */}
             <div className="hidden sm:block">
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Product</TableHead>
-                    <TableHead className="text-right">B (mm)</TableHead>
-                    <TableHead className="text-right">H (mm)</TableHead>
-                    <TableHead className="text-right">m²</TableHead>
+                    <TableHead>Hoeveelheid</TableHead>
                     <TableHead className="text-right">Aantal</TableHead>
-                    <TableHead className="text-right">Prijs/m²</TableHead>
+                    <TableHead className="text-right">Prijs</TableHead>
                     <TableHead className="text-right">Totaal</TableHead>
                     <TableHead />
                   </TableRow>
@@ -169,11 +202,9 @@ export default function Configurator() {
                   {rows.map((r, i) => (
                     <TableRow key={i}>
                       <TableCell className="font-medium">{r.option_name}</TableCell>
-                      <TableCell className="text-right">{r.width_mm}</TableCell>
-                      <TableCell className="text-right">{r.height_mm}</TableCell>
-                      <TableCell className="text-right">{num.format(area(r))}</TableCell>
+                      <TableCell>{metrics(r)}</TableCell>
                       <TableCell className="text-right">{r.quantity}</TableCell>
-                      <TableCell className="text-right">{currency.format(r.unit_price)}</TableCell>
+                      <TableCell className="text-right">{currency.format(r.unit_price)} {unitSuffix[r.unit]}</TableCell>
                       <TableCell className="text-right">{currency.format(lineTotal(r))}</TableCell>
                       <TableCell className="text-right">
                         <Button variant="ghost" size="icon" onClick={() => removeRule(i)}><Trash2 className="h-4 w-4" /></Button>
@@ -181,13 +212,12 @@ export default function Configurator() {
                     </TableRow>
                   ))}
                   {rows.length === 0 && (
-                    <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">Nog geen regels</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">Nog geen regels</TableCell></TableRow>
                   )}
                 </TableBody>
               </Table>
             </div>
 
-            {/* Mobiele kaarten */}
             <div className="grid gap-3 sm:hidden">
               {rows.map((r, i) => (
                 <div key={i} className="rounded-lg border bg-card p-4 shadow-sm">
@@ -199,24 +229,16 @@ export default function Configurator() {
                   </div>
                   <dl className="grid grid-cols-2 gap-3 text-sm">
                     <div>
-                      <dt className="text-xs text-muted-foreground">Breedte</dt>
-                      <dd className="font-medium">{r.width_mm} mm</dd>
-                    </div>
-                    <div>
-                      <dt className="text-xs text-muted-foreground">Hoogte</dt>
-                      <dd className="font-medium">{r.height_mm} mm</dd>
-                    </div>
-                    <div>
-                      <dt className="text-xs text-muted-foreground">Oppervlakte</dt>
-                      <dd className="font-medium">{num.format(area(r))} m²</dd>
+                      <dt className="text-xs text-muted-foreground">Hoeveelheid</dt>
+                      <dd className="font-medium">{metrics(r)}</dd>
                     </div>
                     <div>
                       <dt className="text-xs text-muted-foreground">Aantal</dt>
                       <dd className="font-medium">{r.quantity}</dd>
                     </div>
                     <div>
-                      <dt className="text-xs text-muted-foreground">Prijs/m²</dt>
-                      <dd className="font-medium">{currency.format(r.unit_price)}</dd>
+                      <dt className="text-xs text-muted-foreground">Prijs</dt>
+                      <dd className="font-medium">{currency.format(r.unit_price)} {unitSuffix[r.unit]}</dd>
                     </div>
                     <div>
                       <dt className="text-xs text-muted-foreground">Totaal</dt>
@@ -246,31 +268,49 @@ export default function Configurator() {
                   <Select value={newRow.product_id} onValueChange={pickProduct}>
                     <SelectTrigger className="min-h-11"><SelectValue placeholder="Kies een product" /></SelectTrigger>
                     <SelectContent>
-                      {products.map((p) => (
-                        <SelectItem key={p.id} value={p.id}>
-                          {p.name} — {currency.format(Number(p.unit_price) || 0)}/m²
-                        </SelectItem>
-                      ))}
+                      {products.map((p) => {
+                        const u = ((p.unit ?? "stuk") as Unit);
+                        const uk = (["stuk", "lengte", "oppervlakte"].includes(u) ? u : "stuk") as Unit;
+                        return (
+                          <SelectItem key={p.id} value={p.id}>
+                            {p.name} — {currency.format(Number(p.unit_price) || 0)} {unitSuffix[uk]}
+                          </SelectItem>
+                        );
+                      })}
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="grid gap-3 sm:grid-cols-[1fr_120px_120px_90px_auto] sm:items-end">
-                  <div className="grid gap-1.5">
-                    <label className="text-sm text-muted-foreground">Beschrijving</label>
-                    <Input value={newRow.option_value} onChange={(e) => setNewRow({ ...newRow, option_value: e.target.value })} placeholder="Optioneel" className="min-h-11" />
-                  </div>
-                  <div className="grid gap-1.5">
-                    <label className="text-sm text-muted-foreground">Breedte (mm)</label>
-                    <Input type="number" min={0} value={newRow.width_mm || ""}
-                      onChange={(e) => setNewRow({ ...newRow, width_mm: Number(e.target.value) || 0 })}
-                      className="min-h-11 text-right" />
-                  </div>
-                  <div className="grid gap-1.5">
-                    <label className="text-sm text-muted-foreground">Hoogte (mm)</label>
-                    <Input type="number" min={0} value={newRow.height_mm || ""}
-                      onChange={(e) => setNewRow({ ...newRow, height_mm: Number(e.target.value) || 0 })}
-                      className="min-h-11 text-right" />
-                  </div>
+
+                <div className="grid gap-1.5">
+                  <label className="text-sm text-muted-foreground">Beschrijving</label>
+                  <Input value={newRow.option_value} onChange={(e) => setNewRow({ ...newRow, option_value: e.target.value })} placeholder="Optioneel" className="min-h-11" />
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-4 sm:items-end">
+                  {newRow.unit === "oppervlakte" && (
+                    <>
+                      <div className="grid gap-1.5">
+                        <label className="text-sm text-muted-foreground">Breedte (m)</label>
+                        <Input type="number" min={0} step="0.01" value={newRow.width_mm ? newRow.width_mm / 1000 : ""}
+                          onChange={(e) => setNewRow({ ...newRow, width_mm: Math.round((Number(e.target.value) || 0) * 1000) })}
+                          className="min-h-11 text-right" />
+                      </div>
+                      <div className="grid gap-1.5">
+                        <label className="text-sm text-muted-foreground">Hoogte (m)</label>
+                        <Input type="number" min={0} step="0.01" value={newRow.height_mm ? newRow.height_mm / 1000 : ""}
+                          onChange={(e) => setNewRow({ ...newRow, height_mm: Math.round((Number(e.target.value) || 0) * 1000) })}
+                          className="min-h-11 text-right" />
+                      </div>
+                    </>
+                  )}
+                  {newRow.unit === "lengte" && (
+                    <div className="grid gap-1.5 sm:col-span-2">
+                      <label className="text-sm text-muted-foreground">Lengte (m)</label>
+                      <Input type="number" min={0} step="0.01" value={newRow.width_mm ? newRow.width_mm / 1000 : ""}
+                        onChange={(e) => setNewRow({ ...newRow, width_mm: Math.round((Number(e.target.value) || 0) * 1000) })}
+                        className="min-h-11 text-right" />
+                    </div>
+                  )}
                   <div className="grid gap-1.5">
                     <label className="text-sm text-muted-foreground">Aantal</label>
                     <Input type="number" min={1} value={newRow.quantity}
@@ -282,9 +322,10 @@ export default function Configurator() {
                     Toevoegen
                   </Button>
                 </div>
+
                 <div className="grid grid-cols-1 gap-2 rounded-md bg-muted/40 p-3 text-sm sm:grid-cols-3">
-                  <div>Oppervlakte: <strong>{num.format(area(newRow))} m²</strong></div>
-                  <div>Prijs/m²: <strong>{currency.format(newRow.unit_price)}</strong></div>
+                  <div>Hoeveelheid: <strong>{metrics(newRow)}</strong></div>
+                  <div>Prijs: <strong>{currency.format(newRow.unit_price)} {unitSuffix[newRow.unit]}</strong></div>
                   <div className="sm:text-right">Regeltotaal: <strong>{currency.format(lineTotal(newRow))}</strong></div>
                 </div>
               </div>
@@ -293,7 +334,6 @@ export default function Configurator() {
         </Card>
       </div>
 
-      {/* Sticky totaalbalk — alleen mobiel */}
       <div className="fixed inset-x-0 bottom-0 z-40 border-t bg-background px-4 py-3 shadow-[0_-4px_16px_-4px_rgba(0,0,0,0.15)] sm:hidden">
         <div className="flex items-center justify-between">
           <span className="text-sm text-muted-foreground">Totaal</span>

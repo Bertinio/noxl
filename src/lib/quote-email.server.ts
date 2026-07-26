@@ -21,7 +21,7 @@ export async function sendQuoteEmailWithSupabase(
 
   const { data: items, error: iErr } = await supabase
     .from("project_quote_items")
-    .select("description, quantity, unit_price, total_price, created_at")
+    .select("description, quantity, unit_price, total_price, width_mm, height_mm, unit, created_at")
     .eq("quote_id", quote_id)
     .order("created_at", { ascending: true });
   if (iErr) throw new Error(iErr.message);
@@ -43,8 +43,12 @@ export async function sendQuoteEmailWithSupabase(
       quantity: it.quantity,
       unit_price: Number(it.unit_price),
       total_price: Number(it.total_price),
+      width_mm: Number(it.width_mm ?? 0),
+      height_mm: Number(it.height_mm ?? 0),
+      unit: (it.unit as "stuk" | "lengte" | "oppervlakte" | null) ?? "stuk",
     })),
   });
+
 
   let binary = "";
   for (let i = 0; i < pdfBytes.length; i++) binary += String.fromCharCode(pdfBytes[i]);
