@@ -654,8 +654,11 @@ export const removeUserRole = createServerFn({ method: "POST" })
 // ---------- installer management ----------
 const roleSchema = z.enum(["admin", "installer", "customer"]);
 
-async function countRoleHolders(sb: SB, role: AppRole): Promise<number> {
-  const { count } = await sb
+async function countRoleHolders(_sb: SB, role: AppRole): Promise<number> {
+  // RLS on user_roles restricts SELECT to the caller's own rows, which would
+  // undercount holders. Use the admin client to get the real total.
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { count } = await supabaseAdmin
     .from("user_roles")
     .select("user_id", { count: "exact", head: true })
     .eq("role", role);
