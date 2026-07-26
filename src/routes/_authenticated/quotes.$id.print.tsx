@@ -17,11 +17,16 @@ const currency = new Intl.NumberFormat("nl-BE", { style: "currency", currency: "
 function QuotePrint() {
   const { id } = Route.useParams();
   const fetchQuote = useServerFn(getQuote);
+  const fetchSettings = useServerFn(getInstallerSettings);
   const resendFn = useServerFn(resendQuoteEmail);
   const [sending, setSending] = useState(false);
   const { data, isLoading } = useQuery({
     queryKey: ["quote", id],
     queryFn: () => fetchQuote({ data: { id } }),
+  });
+  const { data: settings } = useQuery({
+    queryKey: ["installer-settings"],
+    queryFn: () => fetchSettings(),
   });
 
   useEffect(() => {
