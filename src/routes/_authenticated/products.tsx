@@ -56,6 +56,7 @@ function ProductsPage() {
         description: form.description || null,
         unit_price: Number(form.unit_price) || 0,
         category: form.category || null,
+        unit: form.unit,
       };
       if (form.id) return doUpdate({ data: { id: form.id, ...payload } });
       return doCreate({ data: payload });
@@ -79,10 +80,12 @@ function ProductsPage() {
   });
 
   function openNew() { setForm(empty); setOpen(true); }
-  function openEdit(p: { id: string; name: string; description: string | null; unit_price: number | string; category: string | null }) {
+  function openEdit(p: { id: string; name: string; description: string | null; unit_price: number | string; category: string | null; unit?: string | null }) {
+    const u = (p.unit ?? "stuk") as Unit;
     setForm({
       id: p.id, name: p.name, description: p.description ?? "",
       unit_price: Number(p.unit_price) || 0, category: p.category ?? "",
+      unit: (["stuk", "lengte", "oppervlakte"].includes(u) ? u : "stuk") as Unit,
     });
     setOpen(true);
   }
@@ -110,25 +113,29 @@ function ProductsPage() {
                   <TableHead>Naam</TableHead>
                   <TableHead>Categorie</TableHead>
                   <TableHead>Beschrijving</TableHead>
-                  <TableHead className="text-right">Prijs/m²</TableHead>
+                  <TableHead className="text-right">Prijs</TableHead>
                   <TableHead />
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {(products.data ?? []).map((p) => (
-                  <TableRow key={p.id}>
-                    <TableCell className="font-medium">{p.name}</TableCell>
-                    <TableCell>{p.category ?? "—"}</TableCell>
-                    <TableCell className="text-muted-foreground max-w-md truncate">{p.description ?? "—"}</TableCell>
-                    <TableCell className="text-right">{currency.format(Number(p.unit_price) || 0)}</TableCell>
-                    <TableCell className="text-right">
-                      <Button variant="ghost" size="icon" onClick={() => openEdit(p)}><Pencil className="h-4 w-4" /></Button>
-                      <Button variant="ghost" size="icon" onClick={() => { if (confirm("Product verwijderen?")) delMut.mutate(p.id); }}>
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {(products.data ?? []).map((p) => {
+                  const u = ((p.unit ?? "stuk") as Unit);
+                  const suffix = unitSuffix[["stuk","lengte","oppervlakte"].includes(u) ? u : "stuk"];
+                  return (
+                    <TableRow key={p.id}>
+                      <TableCell className="font-medium">{p.name}</TableCell>
+                      <TableCell>{p.category ?? "—"}</TableCell>
+                      <TableCell className="text-muted-foreground max-w-md truncate">{p.description ?? "—"}</TableCell>
+                      <TableCell className="text-right">{currency.format(Number(p.unit_price) || 0)} {suffix}</TableCell>
+                      <TableCell className="text-right">
+                        <Button variant="ghost" size="icon" onClick={() => openEdit(p)}><Pencil className="h-4 w-4" /></Button>
+                        <Button variant="ghost" size="icon" onClick={() => { if (confirm("Product verwijderen?")) delMut.mutate(p.id); }}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
                 {(products.data ?? []).length === 0 && (
                   <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">Nog geen producten</TableCell></TableRow>
                 )}
@@ -151,15 +158,27 @@ function ProductsPage() {
               <Input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} placeholder="bv. Raam, Rolluik" />
             </div>
             <div className="grid gap-1.5">
+              <Label>Eenheid</Label>
+              <Select value={form.unit} onValueChange={(v) => setForm({ ...form, unit: v as Unit })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="stuk">{unitLabel.stuk}</SelectItem>
+                  <SelectItem value="lengte">{unitLabel.lengte}</SelectItem>
+                  <SelectItem value="oppervlakte">{unitLabel.oppervlakte}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-1.5">
               <Label>Beschrijving</Label>
               <Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={3} />
             </div>
             <div className="grid gap-1.5">
-              <Label>Prijs per m² (€)</Label>
+              <Label>Prijs {unitSuffix[form.unit]} (€)</Label>
               <Input type="number" min={0} step="0.01" value={form.unit_price}
                 onChange={(e) => setForm({ ...form, unit_price: Number(e.target.value) || 0 })} />
             </div>
           </div>
+
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)}>Annuleren</Button>
             <Button onClick={() => saveMut.mutate()} disabled={saveMut.isPending || !form.name.trim()}>
