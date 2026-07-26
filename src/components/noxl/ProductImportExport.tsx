@@ -106,16 +106,17 @@ export function ProductImportExport() {
       description: p.description ?? "",
       unit_price: Number(p.unit_price) || 0,
       category: p.category ?? "",
+      unit: (p.unit ?? "stuk") as Unit,
     }));
   }
+
+  const EXPORT_COLS = ["name", "description", "unit_price", "category", "unit"];
 
   async function exportXlsx() {
     setExporting("xlsx");
     try {
       const rows = await fetchAll();
-      const ws = XLSX.utils.json_to_sheet(rows, {
-        header: ["name", "description", "unit_price", "category"],
-      });
+      const ws = XLSX.utils.json_to_sheet(rows, { header: EXPORT_COLS });
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Producten");
       XLSX.writeFile(wb, `producten-${new Date().toISOString().slice(0, 10)}.xlsx`);
@@ -131,7 +132,7 @@ export function ProductImportExport() {
     setExporting("csv");
     try {
       const rows = await fetchAll();
-      const csv = Papa.unparse(rows, { columns: ["name", "description", "unit_price", "category"] });
+      const csv = Papa.unparse(rows, { columns: EXPORT_COLS });
       const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -146,6 +147,7 @@ export function ProductImportExport() {
       setExporting(null);
     }
   }
+
 
   const validRows = (preview ?? []).filter((r) => r.data).map((r) => r.data!) as ParsedRow[];
   const errorCount = (preview ?? []).filter((r) => r.errors.length > 0).length;
