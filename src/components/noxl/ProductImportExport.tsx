@@ -12,23 +12,28 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { importProducts, listProducts } from "@/lib/noxl.functions";
 
+type Unit = "stuk" | "lengte" | "oppervlakte";
 type ParsedRow = {
   name: string;
   description: string | null;
   unit_price: number;
   category: string | null;
+  unit: Unit;
 };
 type PreviewRow = { row: number; data?: ParsedRow; errors: string[] };
 
+const ALLOWED_UNITS: Unit[] = ["stuk", "lengte", "oppervlakte"];
+
 function normalizeRows(raw: Record<string, unknown>[]): PreviewRow[] {
   return raw.map((r, i) => {
-    // Case-insensitive key lookup
     const keys: Record<string, unknown> = {};
     for (const k of Object.keys(r)) keys[k.toLowerCase().trim()] = r[k];
     const name = String(keys["name"] ?? "").trim();
     const description = keys["description"] != null ? String(keys["description"]).trim() : "";
     const priceRaw = keys["unit_price"];
     const category = keys["category"] != null ? String(keys["category"]).trim() : "";
+    const unitRaw = keys["unit"] != null ? String(keys["unit"]).trim().toLowerCase() : "";
+    const unit: Unit = (ALLOWED_UNITS.includes(unitRaw as Unit) ? unitRaw : "stuk") as Unit;
     const errors: string[] = [];
     if (!name) errors.push("name is verplicht");
     const priceNum = typeof priceRaw === "number"
@@ -36,15 +41,17 @@ function normalizeRows(raw: Record<string, unknown>[]): PreviewRow[] {
       : Number(String(priceRaw ?? "").replace(",", "."));
     if (!Number.isFinite(priceNum) || priceNum < 0) errors.push("unit_price ongeldig");
     if (name.length > 200) errors.push("name te lang");
+    if (unitRaw && !ALLOWED_UNITS.includes(unitRaw as Unit)) errors.push("unit ongeldig (stuk/lengte/oppervlakte)");
     return {
-      row: i + 2, // +1 header, +1 1-indexed
+      row: i + 2,
       data: errors.length === 0
-        ? { name, description: description || null, unit_price: priceNum, category: category || null }
+        ? { name, description: description || null, unit_price: priceNum, category: category || null, unit }
         : undefined,
       errors,
     };
   });
 }
+
 
 export function ProductImportExport() {
   const qc = useQueryClient();
