@@ -80,11 +80,11 @@ export function AppShell({ role, children, title }: { role: "admin" | "customer"
           </SidebarFooter>
         </Sidebar>
         <div className="flex-1 flex flex-col min-w-0">
-          <header className="h-14 flex items-center gap-3 border-b bg-background px-4">
-            <SidebarTrigger />
-            {title ? <h1 className="text-base font-semibold">{title}</h1> : null}
+          <header className="h-14 flex items-center gap-3 border-b bg-background px-4 sticky top-0 z-30">
+            <SidebarTrigger className="min-h-11 min-w-11" />
+            {title ? <h1 className="text-lg sm:text-base font-semibold truncate">{title}</h1> : null}
           </header>
-          <main className="flex-1 overflow-auto p-6">{children}</main>
+          <main className="flex-1 overflow-auto p-4 sm:p-6">{children}</main>
         </div>
       </div>
     </SidebarProvider>
