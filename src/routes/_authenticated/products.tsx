@@ -16,6 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Toaster } from "@/components/ui/sonner";
 import { listProducts, createProduct, updateProduct, deleteProduct } from "@/lib/noxl.functions";
+import { ProductImportExport } from "@/components/noxl/ProductImportExport";
 
 export const Route = createFileRoute("/_authenticated/products")({
   head: () => ({ meta: [
@@ -83,9 +84,12 @@ function ProductsPage() {
   return (
     <AppShell role="admin" title="Producten">
       <Toaster position="top-right" richColors />
-      <div className="mb-4 flex items-center justify-between">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-muted-foreground">Beheer je productcatalogus. Gebruikt door de configurator.</p>
-        <Button onClick={openNew}><Plus className="mr-1 h-4 w-4" /> Nieuw product</Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <ProductImportExport />
+          <Button onClick={openNew}><Plus className="mr-1 h-4 w-4" /> Nieuw product</Button>
+        </div>
       </div>
 
       <Card>

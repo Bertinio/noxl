@@ -1,0 +1,1 @@
+ALTER TABLE public.products ADD CONSTRAINT products_owner_name_unique UNIQUE (owner_id, name);
