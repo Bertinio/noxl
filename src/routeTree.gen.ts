@@ -19,10 +19,12 @@ import { Route as AuthenticatedDashboardRouteImport } from './routes/_authentica
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as AuthenticatedProjectsIdRouteImport } from './routes/_authenticated/projects.$id'
 import { Route as AuthenticatedCustomersIdRouteImport } from './routes/_authenticated/customers.$id'
+import { Route as AuthenticatedBeheerInstallateursIndexRouteImport } from './routes/_authenticated/beheer.installateurs.index'
 import { Route as AuthenticatedQuotesIdPrintRouteImport } from './routes/_authenticated/quotes.$id.print'
 import { Route as AuthenticatedProjectsIdQuotesRouteImport } from './routes/_authenticated/projects.$id.quotes'
 import { Route as AuthenticatedProjectsIdConfiguratorRouteImport } from './routes/_authenticated/projects.$id.configurator'
 import { Route as AuthenticatedProjectProjectIdConfiguratorRouteImport } from './routes/_authenticated/project.$projectId.configurator'
+import { Route as AuthenticatedBeheerInstallateursIdRouteImport } from './routes/_authenticated/beheer.installateurs.$id'
 
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
@@ -75,6 +77,12 @@ const AuthenticatedCustomersIdRoute =
     path: '/customers/$id',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedBeheerInstallateursIndexRoute =
+  AuthenticatedBeheerInstallateursIndexRouteImport.update({
+    id: '/beheer/installateurs/',
+    path: '/beheer/installateurs/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedQuotesIdPrintRoute =
   AuthenticatedQuotesIdPrintRouteImport.update({
     id: '/quotes/$id/print',
@@ -99,6 +107,12 @@ const AuthenticatedProjectProjectIdConfiguratorRoute =
     path: '/project/$projectId/configurator',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedBeheerInstallateursIdRoute =
+  AuthenticatedBeheerInstallateursIdRouteImport.update({
+    id: '/beheer/installateurs/$id',
+    path: '/beheer/installateurs/$id',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AuthenticatedIndexRoute
@@ -110,10 +124,12 @@ export interface FileRoutesByFullPath {
   '/products': typeof AuthenticatedProductsRoute
   '/customers/$id': typeof AuthenticatedCustomersIdRoute
   '/projects/$id': typeof AuthenticatedProjectsIdRouteWithChildren
+  '/beheer/installateurs/$id': typeof AuthenticatedBeheerInstallateursIdRoute
   '/project/$projectId/configurator': typeof AuthenticatedProjectProjectIdConfiguratorRoute
   '/projects/$id/configurator': typeof AuthenticatedProjectsIdConfiguratorRoute
   '/projects/$id/quotes': typeof AuthenticatedProjectsIdQuotesRoute
   '/quotes/$id/print': typeof AuthenticatedQuotesIdPrintRoute
+  '/beheer/installateurs/': typeof AuthenticatedBeheerInstallateursIndexRoute
 }
 export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
@@ -125,10 +141,12 @@ export interface FileRoutesByTo {
   '/': typeof AuthenticatedIndexRoute
   '/customers/$id': typeof AuthenticatedCustomersIdRoute
   '/projects/$id': typeof AuthenticatedProjectsIdRouteWithChildren
+  '/beheer/installateurs/$id': typeof AuthenticatedBeheerInstallateursIdRoute
   '/project/$projectId/configurator': typeof AuthenticatedProjectProjectIdConfiguratorRoute
   '/projects/$id/configurator': typeof AuthenticatedProjectsIdConfiguratorRoute
   '/projects/$id/quotes': typeof AuthenticatedProjectsIdQuotesRoute
   '/quotes/$id/print': typeof AuthenticatedQuotesIdPrintRoute
+  '/beheer/installateurs': typeof AuthenticatedBeheerInstallateursIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -142,10 +160,12 @@ export interface FileRoutesById {
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/_authenticated/customers/$id': typeof AuthenticatedCustomersIdRoute
   '/_authenticated/projects/$id': typeof AuthenticatedProjectsIdRouteWithChildren
+  '/_authenticated/beheer/installateurs/$id': typeof AuthenticatedBeheerInstallateursIdRoute
   '/_authenticated/project/$projectId/configurator': typeof AuthenticatedProjectProjectIdConfiguratorRoute
   '/_authenticated/projects/$id/configurator': typeof AuthenticatedProjectsIdConfiguratorRoute
   '/_authenticated/projects/$id/quotes': typeof AuthenticatedProjectsIdQuotesRoute
   '/_authenticated/quotes/$id/print': typeof AuthenticatedQuotesIdPrintRoute
+  '/_authenticated/beheer/installateurs/': typeof AuthenticatedBeheerInstallateursIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -159,10 +179,12 @@ export interface FileRouteTypes {
     | '/products'
     | '/customers/$id'
     | '/projects/$id'
+    | '/beheer/installateurs/$id'
     | '/project/$projectId/configurator'
     | '/projects/$id/configurator'
     | '/projects/$id/quotes'
     | '/quotes/$id/print'
+    | '/beheer/installateurs/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/auth'
@@ -174,10 +196,12 @@ export interface FileRouteTypes {
     | '/'
     | '/customers/$id'
     | '/projects/$id'
+    | '/beheer/installateurs/$id'
     | '/project/$projectId/configurator'
     | '/projects/$id/configurator'
     | '/projects/$id/quotes'
     | '/quotes/$id/print'
+    | '/beheer/installateurs'
   id:
     | '__root__'
     | '/_authenticated'
@@ -190,10 +214,12 @@ export interface FileRouteTypes {
     | '/_authenticated/'
     | '/_authenticated/customers/$id'
     | '/_authenticated/projects/$id'
+    | '/_authenticated/beheer/installateurs/$id'
     | '/_authenticated/project/$projectId/configurator'
     | '/_authenticated/projects/$id/configurator'
     | '/_authenticated/projects/$id/quotes'
     | '/_authenticated/quotes/$id/print'
+    | '/_authenticated/beheer/installateurs/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -273,6 +299,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedCustomersIdRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/beheer/installateurs/': {
+      id: '/_authenticated/beheer/installateurs/'
+      path: '/beheer/installateurs'
+      fullPath: '/beheer/installateurs/'
+      preLoaderRoute: typeof AuthenticatedBeheerInstallateursIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/quotes/$id/print': {
       id: '/_authenticated/quotes/$id/print'
       path: '/quotes/$id/print'
@@ -299,6 +332,13 @@ declare module '@tanstack/react-router' {
       path: '/project/$projectId/configurator'
       fullPath: '/project/$projectId/configurator'
       preLoaderRoute: typeof AuthenticatedProjectProjectIdConfiguratorRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/beheer/installateurs/$id': {
+      id: '/_authenticated/beheer/installateurs/$id'
+      path: '/beheer/installateurs/$id'
+      fullPath: '/beheer/installateurs/$id'
+      preLoaderRoute: typeof AuthenticatedBeheerInstallateursIdRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
   }
@@ -330,8 +370,10 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
   AuthenticatedCustomersIdRoute: typeof AuthenticatedCustomersIdRoute
   AuthenticatedProjectsIdRoute: typeof AuthenticatedProjectsIdRouteWithChildren
+  AuthenticatedBeheerInstallateursIdRoute: typeof AuthenticatedBeheerInstallateursIdRoute
   AuthenticatedProjectProjectIdConfiguratorRoute: typeof AuthenticatedProjectProjectIdConfiguratorRoute
   AuthenticatedQuotesIdPrintRoute: typeof AuthenticatedQuotesIdPrintRoute
+  AuthenticatedBeheerInstallateursIndexRoute: typeof AuthenticatedBeheerInstallateursIndexRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
@@ -343,9 +385,13 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
   AuthenticatedCustomersIdRoute: AuthenticatedCustomersIdRoute,
   AuthenticatedProjectsIdRoute: AuthenticatedProjectsIdRouteWithChildren,
+  AuthenticatedBeheerInstallateursIdRoute:
+    AuthenticatedBeheerInstallateursIdRoute,
   AuthenticatedProjectProjectIdConfiguratorRoute:
     AuthenticatedProjectProjectIdConfiguratorRoute,
   AuthenticatedQuotesIdPrintRoute: AuthenticatedQuotesIdPrintRoute,
+  AuthenticatedBeheerInstallateursIndexRoute:
+    AuthenticatedBeheerInstallateursIndexRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =
