@@ -650,3 +650,261 @@ export const removeUserRole = createServerFn({ method: "POST" })
     if (error) return { ok: false as const, message: error.message };
     return { ok: true as const };
   });
+
+// ---------- installer management ----------
+const roleSchema = z.enum(["admin", "installer", "customer"]);
+
+async function countRoleHolders(sb: SB, role: AppRole): Promise<number> {
+  const { count } = await sb
+    .from("user_roles")
+    .select("user_id", { count: "exact", head: true })
+    .eq("role", role);
+  return count ?? 0;
+}
+
+async function computeInstallerStats(sb: SB, installerId: string) {
+  // Quotes are attributed to an installer via projects → customers.owner_id.
+  const { data: customers } = await sb
+    .from("customers")
+    .select("id")
+    .eq("owner_id", installerId);
+  const custIds = (customers ?? []).map((c) => c.id);
+  if (custIds.length === 0) return { generated: 0, sent: 0 };
+
+  const { data: projects } = await sb
+    .from("projects")
+    .select("id")
+    .in("customer_id", custIds);
+  const projIds = (projects ?? []).map((p) => p.id);
+  if (projIds.length === 0) return { generated: 0, sent: 0 };
+
+  const { count: generated } = await sb
+    .from("project_quotes")
+    .select("id", { count: "exact", head: true })
+    .in("project_id", projIds);
+  const { count: sent } = await sb
+    .from("project_quotes")
+    .select("id", { count: "exact", head: true })
+    .in("project_id", projIds)
+    .not("last_email_sent_at", "is", null);
+
+  return { generated: generated ?? 0, sent: sent ?? 0 };
+}
+
+export const listInstallers = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await requireAdmin(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: userList, error: uErr } = await supabaseAdmin.auth.admin.listUsers();
+    if (uErr) throw new Error(uErr.message);
+
+    const { data: roles, error: rErr } = await supabaseAdmin
+      .from("user_roles")
+      .select("user_id, role");
+    if (rErr) throw new Error(rErr.message);
+    const rolesByUser = new Map<string, AppRole[]>();
+    for (const r of roles ?? []) {
+      const arr = rolesByUser.get(r.user_id) ?? [];
+      arr.push(r.role);
+      rolesByUser.set(r.user_id, arr);
+    }
+
+    const installerIds = (userList?.users ?? [])
+      .filter((u) => (rolesByUser.get(u.id) ?? []).includes("installer"))
+      .map((u) => u.id);
+
+    const { data: settings } = await supabaseAdmin
+      .from("installer_settings")
+      .select("user_id, name, company")
+      .in("user_id", installerIds.length > 0 ? installerIds : ["00000000-0000-0000-0000-000000000000"]);
+    const settingsByUser = new Map(
+      (settings ?? []).map((s) => [s.user_id, s] as const),
+    );
+
+    const rows = await Promise.all(
+      installerIds.map(async (id) => {
+        const u = userList!.users.find((x) => x.id === id)!;
+        const s = settingsByUser.get(id) ?? null;
+        const stats = await computeInstallerStats(supabaseAdmin as unknown as SB, id);
+        return {
+          id: u.id,
+          email: u.email ?? "",
+          name: s?.name ?? null,
+          company: s?.company ?? null,
+          roles: rolesByUser.get(u.id) ?? [],
+          last_sign_in_at: u.last_sign_in_at ?? null,
+          generated: stats.generated,
+          sent: stats.sent,
+        };
+      }),
+    );
+
+    return { installers: rows };
+  });
+
+export const getInstallerStats = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({ user_id: z.string().uuid() }).parse(i))
+  .handler(async ({ data, context }) => {
+    await requireAdmin(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    return await computeInstallerStats(supabaseAdmin as unknown as SB, data.user_id);
+  });
+
+export const getInstallerDetail = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({ user_id: z.string().uuid() }).parse(i))
+  .handler(async ({ data, context }) => {
+    await requireAdmin(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: userRes, error: uErr } = await supabaseAdmin.auth.admin.getUserById(data.user_id);
+    if (uErr) throw new Error(uErr.message);
+    const u = userRes?.user;
+    if (!u) throw new Error("Gebruiker niet gevonden");
+
+    const { data: rolesRows } = await supabaseAdmin
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", data.user_id);
+    const roles = (rolesRows ?? []).map((r) => r.role);
+
+    const { data: settings } = await supabaseAdmin
+      .from("installer_settings")
+      .select("name, company, address, vat_number")
+      .eq("user_id", data.user_id)
+      .maybeSingle();
+
+    const { data: customers } = await supabaseAdmin
+      .from("customers")
+      .select("id")
+      .eq("owner_id", data.user_id);
+    const custIds = (customers ?? []).map((c) => c.id);
+
+    let projectIds: string[] = [];
+    if (custIds.length > 0) {
+      const { data: projects } = await supabaseAdmin
+        .from("projects")
+        .select("id")
+        .in("customer_id", custIds);
+      projectIds = (projects ?? []).map((p) => p.id);
+    }
+
+    let generated: Array<{ id: string; quote_number: string; total_price: number; created_at: string; last_email_sent_at: string | null }> = [];
+    if (projectIds.length > 0) {
+      const { data: qs } = await supabaseAdmin
+        .from("project_quotes")
+        .select("id, quote_number, total_price, created_at, last_email_sent_at")
+        .in("project_id", projectIds)
+        .order("created_at", { ascending: false });
+      generated = qs ?? [];
+    }
+    const sent = generated.filter((q) => q.last_email_sent_at !== null);
+
+    return {
+      user: {
+        id: u.id,
+        email: u.email ?? "",
+        last_sign_in_at: u.last_sign_in_at ?? null,
+        created_at: u.created_at,
+      },
+      roles,
+      settings: settings ?? null,
+      generated,
+      sent,
+      counts: { generated: generated.length, sent: sent.length },
+    };
+  });
+
+export const addInstaller = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z.object({ email: z.string().trim().email().max(255) }).parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    await requireAdmin(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: list, error } = await supabaseAdmin.auth.admin.listUsers();
+    if (error) throw new Error(error.message);
+    const found = list?.users?.find(
+      (u) => u.email?.toLowerCase() === data.email.toLowerCase(),
+    );
+    if (!found) {
+      return { ok: false as const, message: "Geen gebruiker gevonden met dit e-mailadres" };
+    }
+    const { error: insErr } = await supabaseAdmin
+      .from("user_roles")
+      .upsert({ user_id: found.id, role: "installer" }, { onConflict: "user_id,role" });
+    if (insErr) return { ok: false as const, message: insErr.message };
+    return { ok: true as const, user_id: found.id };
+  });
+
+export const removeInstaller = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({ user_id: z.string().uuid() }).parse(i))
+  .handler(async ({ data, context }) => {
+    await requireAdmin(context.supabase, context.userId);
+    const total = await countRoleHolders(context.supabase, "installer");
+    if (total <= 1) {
+      return { ok: false as const, message: "Kan de laatste installateur niet verwijderen" };
+    }
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin
+      .from("user_roles")
+      .delete()
+      .eq("user_id", data.user_id)
+      .eq("role", "installer");
+    if (error) return { ok: false as const, message: error.message };
+    return { ok: true as const };
+  });
+
+// Overwrite: set the user to exactly one role among admin/installer/customer.
+// Guards against removing the last admin or last installer.
+export const updateUserRole = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z.object({ user_id: z.string().uuid(), role: roleSchema }).parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    await requireAdmin(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    // Load current roles for this user
+    const { data: current } = await supabaseAdmin
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", data.user_id);
+    const currentRoles = new Set((current ?? []).map((r) => r.role as AppRole));
+
+    // Prevent stranding the app without a last admin/installer
+    for (const guarded of ["admin", "installer"] as const) {
+      if (currentRoles.has(guarded) && data.role !== guarded) {
+        const total = await countRoleHolders(context.supabase, guarded);
+        if (total <= 1) {
+          return {
+            ok: false as const,
+            message:
+              guarded === "admin"
+                ? "Kan de laatste beheerder niet wijzigen"
+                : "Kan de laatste installateur niet wijzigen",
+          };
+        }
+      }
+    }
+
+    // Overwrite: delete existing roles, insert the new one
+    const { error: delErr } = await supabaseAdmin
+      .from("user_roles")
+      .delete()
+      .eq("user_id", data.user_id);
+    if (delErr) return { ok: false as const, message: delErr.message };
+
+    const { error: insErr } = await supabaseAdmin
+      .from("user_roles")
+      .insert({ user_id: data.user_id, role: data.role });
+    if (insErr) return { ok: false as const, message: insErr.message };
+
+    return { ok: true as const };
+  });
