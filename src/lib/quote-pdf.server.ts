@@ -54,11 +54,19 @@ export async function generateQuotePdf(input: QuotePdfInput): Promise<Uint8Array
 
   // Header
   draw("OFFERTE", marginX, y, { size: 20, font: bold });
-  draw("NoXL", width - marginX - 40, y, { size: 14, font: bold });
+  const installer = input.installer ?? null;
+  const brand = installer?.company || installer?.name || "NoXL";
+  draw(brand, width - marginX - Math.min(brand.length * 7, 200), y, { size: 14, font: bold });
   y -= 20;
   draw(input.quoteNumber, marginX, y, { size: 10, color: gray });
-  draw("Offerte-applicatie", width - marginX - 90, y, { size: 8, color: gray });
-  y -= 14;
+  if (installer?.address) {
+    const line = installer.address.replace(/\n/g, " ").slice(0, 60);
+    draw(line, width - marginX - Math.min(line.length * 5, 260), y, { size: 8, color: gray });
+  }
+  y -= 12;
+  if (installer?.vat_number) {
+    draw(`Btw: ${installer.vat_number}`, width - marginX - 120, y, { size: 8, color: gray });
+  }
   draw(`Datum: ${new Date(input.createdAt).toLocaleDateString("nl-BE")}`, marginX, y, { color: gray });
   y -= 30;
 
