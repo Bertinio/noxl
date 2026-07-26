@@ -632,12 +632,8 @@ export const removeUserRole = createServerFn({ method: "POST" })
     await requireAdmin(context.supabase, context.userId);
     // Guard against removing the last admin so the app can never be locked out.
     if (data.role === "admin") {
-      const { supabase } = context;
-      const { count } = await supabase
-        .from("user_roles")
-        .select("user_id", { count: "exact", head: true })
-        .eq("role", "admin");
-      if ((count ?? 0) <= 1) {
+      const total = await countRoleHolders(context.supabase, "admin");
+      if (total <= 1) {
         return { ok: false as const, message: "Kan de laatste beheerder niet verwijderen" };
       }
     }
