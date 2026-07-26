@@ -31,7 +31,12 @@ function QuotesList() {
 
   const generateMut = useMutation({
     mutationFn: () => doGenerate({ data: { project_id: id } }),
-    onSuccess: (r) => { toast.success(`Offerte ${r.quote_number} aangemaakt`); qc.invalidateQueries({ queryKey: ["project", id] }); },
+    onSuccess: (r) => {
+      toast.success(`Offerte ${r.quote_number} aangemaakt`);
+      if (r.emailSent) toast.success("Offerte verzonden naar klant");
+      else if (r.emailError) toast.error(`E-mail niet verzonden: ${r.emailError}`);
+      qc.invalidateQueries({ queryKey: ["project", id] });
+    },
     onError: (e: Error) => toast.error(e.message),
   });
 
