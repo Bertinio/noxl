@@ -1,10 +1,14 @@
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 
+type Unit = "stuk" | "lengte" | "oppervlakte";
 type Item = {
   description: string;
   quantity: number;
   unit_price: number;
   total_price: number;
+  width_mm?: number;
+  height_mm?: number;
+  unit?: Unit | null;
 };
 
 type QuotePdfInput = {
@@ -15,6 +19,7 @@ type QuotePdfInput = {
   project: { title: string; description: string | null } | null;
   items: Item[];
 };
+
 
 const eur = (n: number) =>
   new Intl.NumberFormat("nl-BE", { style: "currency", currency: "EUR" }).format(n);
