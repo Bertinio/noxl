@@ -1,8 +1,27 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { one, handleError } from "@/lib/errors";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/integrations/supabase/types";
+
+type SB = SupabaseClient<Database>;
+type AppRole = Database["public"]["Enums"]["app_role"];
+
+// Verify the current user has the 'admin' role via the security-definer/invoker
+// has_role() function backed by the user_roles table.
+async function requireAdmin(supabase: SB, userId: string) {
+  const { data, error } = await supabase.rpc("has_role", {
+    _user_id: userId,
+    _role: "admin",
+  });
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error("Alleen beheerders");
+}
 
 // ---------- role & role-based context ----------
+// NOTE: does NOT auto-promote first-time users to admin. Admin rights must
+// be granted explicitly via the user_roles table (see /admin panel).
 export const getMyRole = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
@@ -11,16 +30,7 @@ export const getMyRole = createServerFn({ method: "GET" })
       .from("user_roles")
       .select("role")
       .eq("user_id", userId);
-    const roles = (data ?? []).map((r) => r.role as "admin" | "customer");
-    // Auto-promote first-time users to admin so anyone signing up becomes an installer
-    if (roles.length === 0) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const admin = (await import("@/integrations/supabase/client.server")) as any;
-      await admin.supabaseAdmin
-        .from("user_roles")
-        .insert({ user_id: userId, role: "admin" });
-      return { role: "admin" as const };
-    }
+    const roles = (data ?? []).map((r) => r.role);
     if (roles.includes("admin")) return { role: "admin" as const };
     return { role: "customer" as const };
   });
@@ -72,24 +82,21 @@ export const createCustomer = createServerFn({ method: "POST" })
     let authUserId: string | null = null;
 
     if (data.invite) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const admin = (await import("@/integrations/supabase/client.server")) as any;
-      // Try to find existing auth user by email, else invite
-      const { data: existing } = await admin.supabaseAdmin.auth.admin.listUsers();
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { data: existing } = await supabaseAdmin.auth.admin.listUsers();
       const found = existing?.users?.find(
-        (u: { email?: string }) => u.email?.toLowerCase() === data.email.toLowerCase(),
+        (u) => u.email?.toLowerCase() === data.email.toLowerCase(),
       );
       if (found) {
         authUserId = found.id;
       } else {
-        const { data: invited, error: invErr } = await admin.supabaseAdmin.auth.admin.inviteUserByEmail(
-          data.email,
-        );
+        const { data: invited, error: invErr } =
+          await supabaseAdmin.auth.admin.inviteUserByEmail(data.email);
         if (invErr) console.error("[invite]", invErr.message);
         authUserId = invited?.user?.id ?? null;
       }
       if (authUserId) {
-        await admin.supabaseAdmin
+        await supabaseAdmin
           .from("user_roles")
           .upsert({ user_id: authUserId, role: "customer" }, { onConflict: "user_id,role" });
       }
@@ -120,7 +127,18 @@ export const listProjects = createServerFn({ method: "GET" })
       .select("id, title, status, total_price, created_at, customer_id, customers(name)")
       .order("created_at", { ascending: false });
     if (error) throw new Error(error.message);
-    return data ?? [];
+    return (data ?? []).map((p) => {
+      const customer = one(p.customers);
+      return {
+        id: p.id,
+        title: p.title,
+        status: p.status,
+        total_price: p.total_price,
+        created_at: p.created_at,
+        customer_id: p.customer_id,
+        customer_name: customer?.name ?? null,
+      };
+    });
   });
 
 export const getProject = createServerFn({ method: "GET" })
@@ -134,6 +152,7 @@ export const getProject = createServerFn({ method: "GET" })
       .maybeSingle();
     if (error) throw new Error(error.message);
     if (!project) throw new Error("Project niet gevonden");
+    const customer = one(project.customers);
     const { data: configs } = await context.supabase
       .from("configurations")
       .select("id, option_name, option_value, quantity, unit_price, total_price, product_id, width_mm, height_mm, area_m2, created_at")
@@ -144,7 +163,20 @@ export const getProject = createServerFn({ method: "GET" })
       .select("id, quote_number, total_price, created_at")
       .eq("project_id", data.id)
       .order("created_at", { ascending: false });
-    return { project, configurations: configs ?? [], quotes: quotes ?? [] };
+    return {
+      project: {
+        id: project.id,
+        title: project.title,
+        description: project.description,
+        status: project.status,
+        total_price: project.total_price,
+        created_at: project.created_at,
+        customer_id: project.customer_id,
+      },
+      customer,
+      configurations: configs ?? [],
+      quotes: quotes ?? [],
+    };
   });
 
 export const createProject = createServerFn({ method: "POST" })
@@ -356,8 +388,7 @@ export const generateQuote = createServerFn({ method: "POST" })
     const items = configs.map((c) => ({
       quote_id: quote.id,
       product_id: c.product_id ?? null,
-      description:
-        c.option_name + (c.option_value ? ` — ${c.option_value}` : ""),
+      description: c.option_name + (c.option_value ? ` — ${c.option_value}` : ""),
       width_mm: c.width_mm,
       height_mm: c.height_mm,
       quantity: c.quantity,
@@ -372,14 +403,14 @@ export const generateQuote = createServerFn({ method: "POST" })
     let emailError: string | null = null;
     try {
       const { sendQuoteEmailWithSupabase } = await import("./quote-email.server");
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const installerName = (context.claims as any)?.email ?? null;
+      const claims = context.claims as { email?: string } | null | undefined;
+      const installerName = claims?.email ?? null;
       const result = await sendQuoteEmailWithSupabase(supabase, quote.id, installerName);
       if (result.ok) emailSent = true;
       else emailError = result.reason;
     } catch (e) {
-      emailError = (e as Error).message;
-      console.error("[generateQuote] email failed", emailError);
+      const handled = handleError(e);
+      emailError = handled.message;
     }
 
     return { id: quote.id, quote_number: quote.quote_number, emailSent, emailError };
@@ -396,12 +427,27 @@ export const getQuote = createServerFn({ method: "GET" })
       .maybeSingle();
     if (error) throw new Error(error.message);
     if (!quote) throw new Error("Offerte niet gevonden");
+    const project = one(quote.projects);
+    const customer = project ? one(project.customers) : null;
     const { data: items } = await context.supabase
       .from("project_quote_items")
       .select("id, description, quantity, unit_price, total_price")
       .eq("quote_id", data.id)
       .order("created_at", { ascending: true });
-    return { quote, items: items ?? [] };
+    return {
+      quote: {
+        id: quote.id,
+        quote_number: quote.quote_number,
+        total_price: quote.total_price,
+        created_at: quote.created_at,
+        project_id: quote.project_id,
+      },
+      project: project
+        ? { id: project.id, title: project.title, description: project.description }
+        : null,
+      customer,
+      items: items ?? [],
+    };
   });
 
 // ---------- resend quote email ----------
@@ -410,8 +456,8 @@ export const resendQuoteEmail = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => z.object({ quote_id: z.string().uuid() }).parse(i))
   .handler(async ({ data, context }) => {
     const { sendQuoteEmailWithSupabase } = await import("./quote-email.server");
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const installerName = (context.claims as any)?.email ?? null;
+    const claims = context.claims as { email?: string } | null | undefined;
+    const installerName = claims?.email ?? null;
     const result = await sendQuoteEmailWithSupabase(context.supabase, data.quote_id, installerName);
     if (!result.ok) throw new Error(result.reason);
     return result;
@@ -446,4 +492,84 @@ export const myPortalData = createServerFn({ method: "GET" })
       quotes = q ?? [];
     }
     return { customer, projects: projects ?? [], quotes };
+  });
+
+// ---------- admin panel ----------
+export const listAdminUsers = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await requireAdmin(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: userList, error } = await supabaseAdmin.auth.admin.listUsers();
+    if (error) throw new Error(error.message);
+    const { data: roles, error: rErr } = await supabaseAdmin
+      .from("user_roles")
+      .select("user_id, role");
+    if (rErr) throw new Error(rErr.message);
+    const rolesByUser = new Map<string, AppRole[]>();
+    for (const r of roles ?? []) {
+      const arr = rolesByUser.get(r.user_id) ?? [];
+      arr.push(r.role);
+      rolesByUser.set(r.user_id, arr);
+    }
+    const users = (userList?.users ?? []).map((u) => ({
+      id: u.id,
+      email: u.email ?? "",
+      created_at: u.created_at,
+      last_sign_in_at: u.last_sign_in_at ?? null,
+      roles: rolesByUser.get(u.id) ?? [],
+    }));
+    return { users };
+  });
+
+export const addUserRole = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z.object({
+      user_id: z.string().uuid(),
+      role: z.enum(["admin", "customer"]),
+    }).parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    await requireAdmin(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin
+      .from("user_roles")
+      .upsert(
+        { user_id: data.user_id, role: data.role },
+        { onConflict: "user_id,role" },
+      );
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const removeUserRole = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z.object({
+      user_id: z.string().uuid(),
+      role: z.enum(["admin", "customer"]),
+    }).parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    await requireAdmin(context.supabase, context.userId);
+    // Guard against removing the last admin so the app can never be locked out.
+    if (data.role === "admin") {
+      const { supabase } = context;
+      const { count } = await supabase
+        .from("user_roles")
+        .select("user_id", { count: "exact", head: true })
+        .eq("role", "admin");
+      if ((count ?? 0) <= 1) {
+        throw new Error("Kan de laatste beheerder niet verwijderen");
+      }
+    }
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin
+      .from("user_roles")
+      .delete()
+      .eq("user_id", data.user_id)
+      .eq("role", data.role);
+    if (error) throw new Error(error.message);
+    return { ok: true };
   });
