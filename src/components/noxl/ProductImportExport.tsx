@@ -201,7 +201,8 @@ export function ProductImportExport() {
                   <TableHead className="w-14">Rij</TableHead>
                   <TableHead>Naam</TableHead>
                   <TableHead>Categorie</TableHead>
-                  <TableHead className="text-right">Prijs/m²</TableHead>
+                  <TableHead>Eenheid</TableHead>
+                  <TableHead className="text-right">Prijs</TableHead>
                   <TableHead>Beschrijving</TableHead>
                   <TableHead>Status</TableHead>
                 </TableRow>
@@ -212,11 +213,13 @@ export function ProductImportExport() {
                     <TableCell>{r.row}</TableCell>
                     <TableCell>{r.data?.name ?? "—"}</TableCell>
                     <TableCell>{r.data?.category ?? "—"}</TableCell>
+                    <TableCell>{r.data?.unit ?? "—"}</TableCell>
                     <TableCell className="text-right">
                       {r.data ? r.data.unit_price.toFixed(2) : "—"}
                     </TableCell>
                     <TableCell className="max-w-xs truncate">{r.data?.description ?? "—"}</TableCell>
                     <TableCell>
+
                       {r.errors.length === 0
                         ? <span className="text-emerald-600">OK</span>
                         : <span className="text-destructive">{r.errors.join(", ")}</span>}
