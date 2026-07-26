@@ -313,9 +313,29 @@ const configItemSchema = z.object({
   option_value: z.string().trim().max(500).optional().nullable(),
   width_mm: z.number().min(0).max(100000),
   height_mm: z.number().min(0).max(100000),
-  quantity: z.number().int().min(0).max(100000),
+  quantity: z.number().min(0).max(100000),
   unit_price: z.number().min(0).max(1_000_000),
+  unit: unitSchema.default("stuk"),
 });
+
+function computeLineTotal(it: {
+  unit: ProductUnit;
+  width_mm: number;
+  height_mm: number;
+  quantity: number;
+  unit_price: number;
+}) {
+  const qty = it.quantity || 0;
+  if (it.unit === "oppervlakte") {
+    const area = (it.width_mm * it.height_mm) / 1_000_000;
+    return area * it.unit_price * qty;
+  }
+  if (it.unit === "lengte") {
+    const len = it.width_mm / 1000;
+    return len * it.unit_price * qty;
+  }
+  return qty * it.unit_price;
+}
 
 export const saveConfigurations = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -333,11 +353,10 @@ export const saveConfigurations = createServerFn({ method: "POST" })
       .eq("project_id", data.project_id);
     if (delErr) throw new Error(delErr.message);
 
-    const computed = data.items.map((it) => {
-      const area = (it.width_mm * it.height_mm) / 1_000_000;
-      const line = area * it.unit_price * it.quantity;
-      return { it, area, line: Number(line.toFixed(2)) };
-    });
+    const computed = data.items.map((it) => ({
+      it,
+      line: Number(computeLineTotal(it).toFixed(2)),
+    }));
 
     if (computed.length > 0) {
       const payload = computed.map(({ it, line }) => ({
@@ -350,10 +369,12 @@ export const saveConfigurations = createServerFn({ method: "POST" })
         quantity: it.quantity,
         unit_price: it.unit_price,
         total_price: line,
+        unit: it.unit,
       }));
       const { error: insErr } = await supabase.from("configurations").insert(payload);
       if (insErr) throw new Error(insErr.message);
     }
+
 
     const total = computed.reduce((s, c) => s + c.line, 0);
     const status = computed.length > 0 ? "configured" : "draft";
