@@ -70,9 +70,16 @@ function QuotePrint() {
               <p className="mt-1 text-sm">{q.quote_number}</p>
               <p className="text-sm">Datum: {new Date(q.created_at).toLocaleDateString("nl-BE")}</p>
             </div>
-            <div className="text-right">
-              <div className="text-lg font-bold">NoXL</div>
-              <div className="text-xs">Offerte-applicatie</div>
+            <div className="text-right text-sm">
+              {settings?.company && <div className="text-lg font-bold">{settings.company}</div>}
+              {settings?.name && <div>{settings.name}</div>}
+              {settings?.address && (
+                <div className="whitespace-pre-line">{settings.address}</div>
+              )}
+              {settings?.vat_number && <div>BTW: {settings.vat_number}</div>}
+              {!settings?.company && !settings?.name && !settings?.address && !settings?.vat_number && (
+                <div className="text-lg font-bold">NoXL</div>
+              )}
             </div>
           </div>
 
