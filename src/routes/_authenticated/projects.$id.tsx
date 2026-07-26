@@ -34,6 +34,8 @@ function ProjectDetail() {
     mutationFn: () => doGenerate({ data: { project_id: id } }),
     onSuccess: (r) => {
       toast.success(`Offerte ${r.quote_number} aangemaakt`);
+      if (r.emailSent) toast.success("Offerte verzonden naar klant");
+      else if (r.emailError) toast.error(`E-mail niet verzonden: ${r.emailError}`);
       qc.invalidateQueries({ queryKey: ["project", id] });
       navigate({ to: "/projects/$id/quotes", params: { id } });
     },
