@@ -32,6 +32,7 @@ const installerNav: NavItem[] = [
 ];
 
 const adminExtraNav: NavItem[] = [
+  { title: "Installateurs", url: "/beheer/installateurs", icon: Users },
   { title: "Beheer", url: "/admin", icon: ShieldCheck },
 ];
 
