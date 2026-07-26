@@ -860,7 +860,8 @@ export const removeInstaller = createServerFn({ method: "POST" })
   });
 
 // Overwrite: set the user to exactly one role among admin/installer/customer.
-// Guards against removing the last admin or last installer.
+// Overwrite: set the user to exactly one role among admin/installer/customer.
+// Only guard: never remove the last admin (app would be locked out).
 export const updateUserRole = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) =>
@@ -877,19 +878,15 @@ export const updateUserRole = createServerFn({ method: "POST" })
       .eq("user_id", data.user_id);
     const currentRoles = new Set((current ?? []).map((r) => r.role as AppRole));
 
-    // Prevent stranding the app without a last admin/installer
-    for (const guarded of ["admin", "installer"] as const) {
-      if (currentRoles.has(guarded) && data.role !== guarded) {
-        const total = await countRoleHolders(context.supabase, guarded);
-        if (total <= 1) {
-          return {
-            ok: false as const,
-            message:
-              guarded === "admin"
-                ? "Kan de laatste beheerder niet wijzigen"
-                : "Kan de laatste installateur niet wijzigen",
-          };
-        }
+    // Last-admin guard: block only when removing the admin role and this user
+    // is the only admin left.
+    if (currentRoles.has("admin") && data.role !== "admin") {
+      const adminCount = await countRoleHolders(context.supabase, "admin");
+      if (adminCount <= 1) {
+        return {
+          ok: false as const,
+          message: "Kan de laatste beheerder niet verwijderen",
+        };
       }
     }
 
