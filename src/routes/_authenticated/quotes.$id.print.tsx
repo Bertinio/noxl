@@ -43,9 +43,8 @@ function QuotePrint() {
   if (isLoading) return <div className="flex min-h-screen items-center justify-center"><Loader2 className="h-6 w-6 animate-spin" /></div>;
   if (!data) return null;
   const q = data.quote;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const project = (q as any).projects as { title: string; description: string | null; customers: { name: string; email: string; company: string | null; address: string | null } | null } | null;
-  const customer = project?.customers;
+  const project = data.project;
+  const customer = data.customer;
 
   return (
     <div className="min-h-screen bg-white text-black">

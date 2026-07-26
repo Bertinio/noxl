@@ -241,8 +241,7 @@ function Dashboard() {
                   {(projects.data ?? []).map((p) => (
                     <TableRow key={p.id} className="cursor-pointer" onClick={() => navigate({ to: "/projects/$id", params: { id: p.id } })}>
                       <TableCell className="font-medium">{p.title}</TableCell>
-                      {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                      <TableCell>{(p as any).customers?.name ?? "—"}</TableCell>
+                      <TableCell>{p.customer_name ?? "—"}</TableCell>
                       <TableCell><Badge variant="outline">{p.status}</Badge></TableCell>
                       <TableCell className="text-right">{currency.format(Number(p.total_price ?? 0))}</TableCell>
                     </TableRow>
@@ -268,8 +267,7 @@ function Dashboard() {
                   <div className="mt-1 text-lg font-bold text-primary">
                     {currency.format(Number(p.total_price ?? 0))}
                   </div>
-                  {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                  <div className="mt-1 text-xs text-muted-foreground truncate">{(p as any).customers?.name ?? "—"}</div>
+                  <div className="mt-1 text-xs text-muted-foreground truncate">{p.customer_name ?? "—"}</div>
                 </button>
               ))}
               {(projects.data ?? []).length === 0 && !projects.isLoading && (
