@@ -32,7 +32,52 @@ export const getMyRole = createServerFn({ method: "GET" })
       .eq("user_id", userId);
     const roles = (data ?? []).map((r) => r.role);
     if (roles.includes("admin")) return { role: "admin" as const };
-    return { role: "customer" as const };
+    if (roles.includes("installer")) return { role: "installer" as const };
+    if (roles.includes("customer")) return { role: "customer" as const };
+    // No role yet (edge case for pre-trigger accounts): treat as installer.
+    return { role: "installer" as const };
+  });
+
+// ---------- installer settings ----------
+const installerSettingsSchema = z.object({
+  name: z.string().trim().max(200).optional().nullable(),
+  company: z.string().trim().max(200).optional().nullable(),
+  address: z.string().trim().max(500).optional().nullable(),
+  vat_number: z.string().trim().max(50).optional().nullable(),
+});
+
+export const getInstallerSettings = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase, userId } = context;
+    const { data, error } = await supabase
+      .from("installer_settings")
+      .select("user_id, name, company, address, vat_number, unit_price")
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    return data ?? { user_id: userId, name: null, company: null, address: null, vat_number: null, unit_price: 150 };
+  });
+
+export const updateInstallerSettings = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => installerSettingsSchema.parse(i))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const { error } = await supabase
+      .from("installer_settings")
+      .upsert(
+        {
+          user_id: userId,
+          name: data.name ?? null,
+          company: data.company ?? null,
+          address: data.address ?? null,
+          vat_number: data.vat_number ?? null,
+        },
+        { onConflict: "user_id" },
+      );
+    if (error) throw new Error(error.message);
+    return { ok: true };
   });
 
 // ---------- customers ----------
