@@ -53,9 +53,13 @@ function AdminPanel() {
 
   const removeMut = useMutation({
     mutationFn: (v: { user_id: string; role: AppRole }) => doRemove({ data: v }),
-    onSuccess: () => {
-      toast.success("Rol verwijderd");
-      qc.invalidateQueries({ queryKey: ["admin-users"] });
+    onSuccess: (res) => {
+      if (res.ok) {
+        toast.success("Rol verwijderd");
+        qc.invalidateQueries({ queryKey: ["admin-users"] });
+      } else {
+        toast.error(res.message);
+      }
     },
     onError: (e: Error) => toast.error(e.message),
   });
