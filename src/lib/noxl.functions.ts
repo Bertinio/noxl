@@ -236,6 +236,34 @@ export const deleteProduct = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+// Bulk import: upsert products by (owner_id, name)
+const importRowSchema = z.object({
+  name: z.string().trim().min(1).max(200),
+  description: z.string().trim().max(2000).optional().nullable(),
+  unit_price: z.number().min(0).max(1_000_000),
+  category: z.string().trim().max(100).optional().nullable(),
+});
+
+export const importProducts = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z.object({ rows: z.array(importRowSchema).min(1).max(5000) }).parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    const payload = data.rows.map((r) => ({
+      owner_id: context.userId,
+      name: r.name,
+      description: r.description ?? null,
+      unit_price: r.unit_price,
+      category: r.category ?? null,
+    }));
+    const { error } = await context.supabase
+      .from("products")
+      .upsert(payload, { onConflict: "owner_id,name" });
+    if (error) throw new Error(error.message);
+    return { ok: true, count: payload.length };
+  });
+
 // ---------- configurations ----------
 const configItemSchema = z.object({
   id: z.string().uuid().optional(),
