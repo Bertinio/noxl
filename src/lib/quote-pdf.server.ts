@@ -109,14 +109,29 @@ export async function generateQuotePdf(input: QuotePdfInput): Promise<Uint8Array
 
   for (const it of input.items) {
     if (y < 80) break;
+    const unit = it.unit ?? "stuk";
+    let qtyLabel = String(it.quantity);
+    let priceLabel = eur(Number(it.unit_price));
+    if (unit === "oppervlakte") {
+      const area = ((it.width_mm ?? 0) * (it.height_mm ?? 0)) / 1_000_000;
+      qtyLabel = `${it.quantity} × ${area.toFixed(2)} m²`;
+      priceLabel = `${eur(Number(it.unit_price))} / m²`;
+    } else if (unit === "lengte") {
+      const len = (it.width_mm ?? 0) / 1000;
+      qtyLabel = `${it.quantity} × ${len.toFixed(2)} m`;
+      priceLabel = `${eur(Number(it.unit_price))} / m`;
+    } else {
+      priceLabel = `${eur(Number(it.unit_price))} / stuk`;
+    }
     const desc = it.description.length > 60 ? it.description.slice(0, 57) + "..." : it.description;
     draw(desc, colX.desc, y);
-    draw(String(it.quantity), colX.qty, y);
-    draw(eur(Number(it.unit_price)), colX.price, y);
+    draw(qtyLabel, colX.qty, y);
+    draw(priceLabel, colX.price, y);
     draw(eur(Number(it.total_price)), colX.total, y);
     y -= 16;
     page.drawLine({ start: { x: marginX, y: y + 4 }, end: { x: width - marginX, y: y + 4 }, thickness: 0.3, color: gray });
   }
+
 
   y -= 8;
   page.drawLine({ start: { x: marginX, y: y + 4 }, end: { x: width - marginX, y: y + 4 }, thickness: 1.5, color: black });
