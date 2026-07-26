@@ -19,7 +19,7 @@ function RoleRedirect() {
 
   useEffect(() => {
     if (!data) return;
-    navigate({ to: data.role === "admin" ? "/dashboard" : "/portal", replace: true });
+    navigate({ to: data.role === "customer" ? "/portal" : "/dashboard", replace: true });
   }, [data, navigate]);
 
   return (
