@@ -203,11 +203,15 @@ export const createProject = createServerFn({ method: "POST" })
   });
 
 // ---------- products ----------
+const unitSchema = z.enum(["stuk", "lengte", "oppervlakte"]);
+export type ProductUnit = z.infer<typeof unitSchema>;
+
 const productInputSchema = z.object({
   name: z.string().trim().min(1).max(200),
   description: z.string().trim().max(2000).optional().nullable(),
   unit_price: z.number().min(0).max(1_000_000),
   category: z.string().trim().max(100).optional().nullable(),
+  unit: unitSchema.default("stuk"),
 });
 
 export const listProducts = createServerFn({ method: "GET" })
@@ -215,7 +219,7 @@ export const listProducts = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const { data, error } = await context.supabase
       .from("products")
-      .select("id, name, description, unit_price, category, created_at")
+      .select("id, name, description, unit_price, category, unit, created_at")
       .order("created_at", { ascending: false });
     if (error) throw new Error(error.message);
     return data ?? [];
@@ -233,6 +237,7 @@ export const createProduct = createServerFn({ method: "POST" })
         description: data.description ?? null,
         unit_price: data.unit_price,
         category: data.category ?? null,
+        unit: data.unit,
       })
       .select("id")
       .single();
@@ -253,6 +258,7 @@ export const updateProduct = createServerFn({ method: "POST" })
         description: data.description ?? null,
         unit_price: data.unit_price,
         category: data.category ?? null,
+        unit: data.unit,
       })
       .eq("id", data.id);
     if (error) throw new Error(error.message);
@@ -274,6 +280,7 @@ const importRowSchema = z.object({
   description: z.string().trim().max(2000).optional().nullable(),
   unit_price: z.number().min(0).max(1_000_000),
   category: z.string().trim().max(100).optional().nullable(),
+  unit: unitSchema.default("stuk"),
 });
 
 export const importProducts = createServerFn({ method: "POST" })
@@ -288,6 +295,7 @@ export const importProducts = createServerFn({ method: "POST" })
       description: r.description ?? null,
       unit_price: r.unit_price,
       category: r.category ?? null,
+      unit: r.unit,
     }));
     const { error } = await context.supabase
       .from("products")
@@ -295,6 +303,7 @@ export const importProducts = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { ok: true, count: payload.length };
   });
+
 
 // ---------- configurations ----------
 const configItemSchema = z.object({
