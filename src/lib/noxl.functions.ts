@@ -395,7 +395,7 @@ export const generateQuote = createServerFn({ method: "POST" })
     const { supabase } = context;
     const { data: configs, error: cErr } = await supabase
       .from("configurations")
-      .select("option_name, option_value, quantity, unit_price, total_price, product_id, width_mm, height_mm")
+      .select("option_name, option_value, quantity, unit_price, total_price, product_id, width_mm, height_mm, unit")
       .eq("project_id", data.project_id);
     if (cErr) throw new Error(cErr.message);
     if (!configs || configs.length === 0) throw new Error("Voeg eerst configuratieregels toe");
@@ -424,9 +424,11 @@ export const generateQuote = createServerFn({ method: "POST" })
       quantity: c.quantity,
       unit_price: Number(c.unit_price),
       total_price: Number(c.total_price ?? 0),
+      unit: c.unit ?? "stuk",
     }));
     const { error: iErr } = await supabase.from("project_quote_items").insert(items);
     if (iErr) throw new Error(iErr.message);
+
 
     // Send quote email to customer
     let emailSent = false;
