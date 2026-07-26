@@ -604,7 +604,7 @@ export const addUserRole = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) =>
     z.object({
       user_id: z.string().uuid(),
-      role: z.enum(["admin", "customer"]),
+      role: z.enum(["admin", "installer", "customer"]),
     }).parse(i),
   )
   .handler(async ({ data, context }) => {
@@ -625,7 +625,7 @@ export const removeUserRole = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) =>
     z.object({
       user_id: z.string().uuid(),
-      role: z.enum(["admin", "customer"]),
+      role: z.enum(["admin", "installer", "customer"]),
     }).parse(i),
   )
   .handler(async ({ data, context }) => {
