@@ -45,8 +45,7 @@ function ProjectDetail() {
   if (isLoading) return <div className="flex min-h-screen items-center justify-center"><Loader2 className="h-6 w-6 animate-spin" /></div>;
   if (!data) return null;
   const p = data.project;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const customer = (p as any).customers as { id: string; name: string } | null;
+  const customer = data.customer;
 
   return (
     <AppShell role="admin" title={p.title}>

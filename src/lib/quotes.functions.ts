@@ -1,6 +1,10 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/integrations/supabase/types";
+
+type SB = SupabaseClient<Database>;
 
 const DEFAULT_UNIT_PRICE = 150;
 
@@ -18,8 +22,7 @@ const quoteInputSchema = z.object({
   items: z.array(quoteItemSchema).min(1).max(50),
 });
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function getOrCreateUnitPrice(supabase: any, userId: string): Promise<number> {
+async function getOrCreateUnitPrice(supabase: SB, userId: string): Promise<number> {
   const { data } = await supabase
     .from("installer_settings")
     .select("unit_price")

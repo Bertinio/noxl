@@ -1,5 +1,5 @@
 import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
-import { LayoutDashboard, Users, FolderKanban, LogOut, FileText, Home, Package } from "lucide-react";
+import { LayoutDashboard, Users, FolderKanban, LogOut, FileText, Home, Package, ShieldCheck } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import {
@@ -17,14 +17,16 @@ import {
   SidebarFooter,
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
-import type { ReactNode } from "react";
+import { Badge } from "@/components/ui/badge";
+import type { ComponentType, ReactNode } from "react";
 
-type NavItem = { title: string; url: string; icon: React.ComponentType<{ className?: string }> };
+type NavItem = { title: string; url: string; icon: ComponentType<{ className?: string }> };
 
 const adminNav: NavItem[] = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
   { title: "Klanten", url: "/dashboard", icon: Users },
   { title: "Producten", url: "/products", icon: Package },
+  { title: "Beheer", url: "/admin", icon: ShieldCheck },
 ];
 
 const portalNav: NavItem[] = [
@@ -83,6 +85,11 @@ export function AppShell({ role, children, title }: { role: "admin" | "customer"
           <header className="h-14 flex items-center gap-3 border-b bg-background px-4 sticky top-0 z-30">
             <SidebarTrigger className="min-h-11 min-w-11" />
             {title ? <h1 className="text-lg sm:text-base font-semibold truncate">{title}</h1> : null}
+            {role === "admin" ? (
+              <Badge variant="secondary" className="ml-auto gap-1">
+                <ShieldCheck className="h-3 w-3" /> Admin
+              </Badge>
+            ) : null}
           </header>
           <main className="flex-1 overflow-auto p-4 sm:p-6">{children}</main>
         </div>
