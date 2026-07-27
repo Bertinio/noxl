@@ -38,12 +38,13 @@ export async function sendQuoteEmailWithSupabase(
     company: string | null;
     address: string | null;
     vat_number: string | null;
+    terms: string | null;
   } | null = null;
   const ownerId = customer.owner_id ?? null;
   if (ownerId) {
     const { data: s } = await supabase
       .from("installer_settings")
-      .select("name, company, address, vat_number")
+      .select("name, company, address, vat_number, terms")
       .eq("user_id", ownerId)
       .maybeSingle();
     if (s) installer = s;
