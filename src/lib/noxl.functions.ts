@@ -45,7 +45,9 @@ const installerSettingsSchema = z.object({
   address: z.string().trim().max(500).optional().nullable(),
   vat_number: z.string().trim().max(50).optional().nullable(),
   terms: z.string().trim().max(10000).optional().nullable(),
+  vat_rate: z.union([z.literal(6), z.literal(21)]).optional(),
 });
+
 
 export const getInstallerSettings = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
