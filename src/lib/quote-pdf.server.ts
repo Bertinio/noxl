@@ -203,7 +203,7 @@ export async function generateQuotePdf(input: QuotePdfInput): Promise<Uint8Array
     let cur = "";
     for (const w of words) {
       const test = cur ? cur + " " + w : w;
-      if (font.widthOfTextAtSize(test, size) > maxWidth) {
+      if (font.widthOfTextAtSize(normalizeText(test), size) > maxWidth) {
         if (cur) lines.push(cur);
         cur = w;
       } else {
