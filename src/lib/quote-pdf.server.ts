@@ -17,7 +17,7 @@ type QuotePdfInput = {
   totalPrice: number;
   customer: { name: string; email: string; company: string | null; address: string | null } | null;
   project: { title: string; description: string | null } | null;
-  installer?: { name: string | null; company: string | null; address: string | null; vat_number: string | null; terms?: string | null } | null;
+  installer?: { name: string | null; company: string | null; address: string | null; vat_number: string | null; terms?: string | null; vat_rate?: number | null } | null;
   items: Item[];
 };
 
