@@ -148,8 +148,8 @@ export async function generateQuotePdf(input: QuotePdfInput): Promise<Uint8Array
     draw(qtyLabel, colX.qty, y);
     draw(priceLabel, colX.price, y);
     draw(eur(Number(it.total_price)), colX.total, y);
+    page.drawLine({ start: { x: marginX, y: y - 4 }, end: { x: width - marginX, y: y - 4 }, thickness: 0.3, color: gray });
     y -= 16;
-    page.drawLine({ start: { x: marginX, y: y + 4 }, end: { x: width - marginX, y: y + 4 }, thickness: 0.3, color: gray });
   }
 
 
