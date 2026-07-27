@@ -24,6 +24,8 @@ function ProjectDetail() {
   const qc = useQueryClient();
   const fetchProject = useServerFn(getProject);
   const doGenerate = useServerFn(generateQuote);
+  const doUpdateVat = useServerFn(updateProjectVatRate);
+
 
   const { data, isLoading } = useQuery({
     queryKey: ["project", id],
