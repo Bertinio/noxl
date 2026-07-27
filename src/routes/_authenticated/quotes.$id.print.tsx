@@ -121,11 +121,30 @@ function QuotePrint() {
               ))}
             </tbody>
             <tfoot>
-              <tr className="border-t-2 border-black">
-                <td colSpan={3} className="py-2 text-right font-bold">TOTAAL</td>
-                <td className="py-2 text-right font-bold">{currency.format(Number(q.total_price))}</td>
-              </tr>
+              {(() => {
+                const subtotal = Number(q.total_price);
+                const vatRate = Number((settings as { vat_rate?: number } | undefined)?.vat_rate ?? 21);
+                const vat = subtotal * (vatRate / 100);
+                const total = subtotal + vat;
+                return (
+                  <>
+                    <tr className="border-t-2 border-black">
+                      <td colSpan={3} className="py-2 text-right">Subtotaal</td>
+                      <td className="py-2 text-right">{currency.format(subtotal)}</td>
+                    </tr>
+                    <tr>
+                      <td colSpan={3} className="py-1 text-right">BTW ({vatRate}%)</td>
+                      <td className="py-1 text-right">{currency.format(vat)}</td>
+                    </tr>
+                    <tr className="border-t border-black">
+                      <td colSpan={3} className="py-2 text-right font-bold">Totaal incl. BTW</td>
+                      <td className="py-2 text-right font-bold">{currency.format(total)}</td>
+                    </tr>
+                  </>
+                );
+              })()}
             </tfoot>
+
           </table>
 
           <div className="mt-8 border-t border-black/30 pt-4">
