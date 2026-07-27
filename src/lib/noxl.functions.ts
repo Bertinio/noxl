@@ -78,10 +78,12 @@ export const updateInstallerSettings = createServerFn({ method: "POST" })
           address: data.address ?? null,
           vat_number: data.vat_number ?? null,
           terms: data.terms ?? null,
+          ...(data.vat_rate !== undefined ? { vat_rate: data.vat_rate } : {}),
         },
         { onConflict: "user_id" },
       );
     if (error) throw new Error(error.message);
+
     return { ok: true };
   });
 
