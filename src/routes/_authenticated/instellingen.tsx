@@ -33,16 +33,18 @@ function SettingsPage() {
     queryFn: () => fetchSettings(),
   });
 
-  const [form, setForm] = useState({ name: "", company: "", address: "", vat_number: "", terms: "" });
+  const [form, setForm] = useState({ name: "", company: "", address: "", vat_number: "", terms: "", vat_rate: 21 as 6 | 21 });
 
   useEffect(() => {
     if (data) {
+      const rate = Number((data as { vat_rate?: number }).vat_rate ?? 21);
       setForm({
         name: data.name ?? "",
         company: data.company ?? "",
         address: data.address ?? "",
         vat_number: data.vat_number ?? "",
         terms: (data as { terms?: string | null }).terms ?? "",
+        vat_rate: rate === 6 ? 6 : 21,
       });
     }
   }, [data]);
@@ -56,6 +58,7 @@ function SettingsPage() {
           address: form.address.trim() || null,
           vat_number: form.vat_number.trim() || null,
           terms: form.terms.trim() || null,
+          vat_rate: form.vat_rate,
         },
       }),
     onSuccess: () => {
@@ -64,6 +67,7 @@ function SettingsPage() {
     },
     onError: (e: Error) => toast.error(e.message),
   });
+
 
   if (isLoading) {
     return <div className="flex min-h-screen items-center justify-center"><Loader2 className="h-6 w-6 animate-spin" /></div>;
