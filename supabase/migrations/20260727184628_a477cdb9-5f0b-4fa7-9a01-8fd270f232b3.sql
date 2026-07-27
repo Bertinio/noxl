@@ -1,0 +1,1 @@
+ALTER TABLE public.installer_settings ADD COLUMN IF NOT EXISTS vat_rate numeric NOT NULL DEFAULT 21 CHECK (vat_rate IN (6, 21));
