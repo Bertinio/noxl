@@ -26,6 +26,20 @@ type QuotePdfInput = {
 const eur = (n: number) =>
   new Intl.NumberFormat("nl-BE", { style: "currency", currency: "EUR" }).format(n);
 
+function normalizeText(text: string): string {
+  return (text ?? "")
+    .replace(/\u2011/g, "-") // non-breaking hyphen
+    .replace(/\u2013/g, "-") // en-dash
+    .replace(/\u2014/g, "-") // em-dash
+    .replace(/\u2212/g, "-") // minus sign
+    .replace(/\u00AD/g, "")  // soft hyphen
+    .replace(/[\u2018\u2019\u201A\u2032]/g, "'")
+    .replace(/[\u201C\u201D\u201E\u2033]/g, '"')
+    .replace(/\u2026/g, "...")
+    .replace(/\u00A0/g, " ");
+}
+
+
 export async function generateQuotePdf(input: QuotePdfInput): Promise<Uint8Array> {
   const doc = await PDFDocument.create();
   const page = doc.addPage([595.28, 841.89]); // A4
