@@ -87,6 +87,40 @@ function ProjectDetail() {
         </Card>
 
         <Card>
+          <CardHeader><CardTitle>BTW-tarief voor dit project</CardTitle></CardHeader>
+          <CardContent>
+            {(() => {
+              const vatRate = Number(p.vat_rate ?? 21);
+              const subtotal = data.configurations.reduce((s, c) => s + Number(c.total_price ?? 0), 0);
+              const vatAmount = subtotal * (vatRate / 100);
+              const totalIncl = subtotal + vatAmount;
+              return (
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="grid gap-1.5">
+                    <label htmlFor="vat_rate" className="text-sm font-medium">BTW-tarief</label>
+                    <select
+                      id="vat_rate"
+                      value={vatRate}
+                      disabled={vatMut.isPending}
+                      onChange={(e) => vatMut.mutate(Number(e.target.value) === 6 ? 6 : 21)}
+                      className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+                    >
+                      <option value={6}>6%</option>
+                      <option value={21}>21%</option>
+                    </select>
+                  </div>
+                  <div className="rounded-md border p-4 text-sm">
+                    <div className="flex justify-between py-1"><span>Subtotaal</span><span>{currency.format(subtotal)}</span></div>
+                    <div className="flex justify-between py-1"><span>BTW ({vatRate}%)</span><span>{currency.format(vatAmount)}</span></div>
+                    <div className="mt-1 flex justify-between border-t pt-2 font-semibold"><span>Totaal incl. BTW</span><span>{currency.format(totalIncl)}</span></div>
+                  </div>
+                </div>
+              );
+            })()}
+          </CardContent>
+
+
+        <Card>
           <CardHeader><CardTitle>Configuratie</CardTitle></CardHeader>
           <CardContent>
             <Table>
