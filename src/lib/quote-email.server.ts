@@ -12,10 +12,11 @@ export async function sendQuoteEmailWithSupabase(
   const { data: quote, error: qErr } = await supabase
     .from("project_quotes")
     .select(
-      "id, quote_number, total_price, created_at, project_id, projects(title, description, customers(name, email, company, address, owner_id))",
+      "id, quote_number, total_price, created_at, project_id, projects(title, description, vat_rate, customers(name, email, company, address, owner_id))",
     )
     .eq("id", quote_id)
     .maybeSingle();
+
   if (qErr) throw new Error(qErr.message);
   if (!quote) throw new Error("Offerte niet gevonden");
 
