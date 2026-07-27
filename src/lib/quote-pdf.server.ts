@@ -58,7 +58,7 @@ export async function generateQuotePdf(input: QuotePdfInput): Promise<Uint8Array
     yy: number,
     opts: { size?: number; font?: typeof font; color?: ReturnType<typeof rgb> } = {},
   ) => {
-    page.drawText(text, {
+    page.drawText(normalizeText(text), {
       x,
       y: yy,
       size: opts.size ?? 10,
