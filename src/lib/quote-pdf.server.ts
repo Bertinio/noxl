@@ -26,6 +26,20 @@ type QuotePdfInput = {
 const eur = (n: number) =>
   new Intl.NumberFormat("nl-BE", { style: "currency", currency: "EUR" }).format(n);
 
+function normalizeText(text: string): string {
+  return (text ?? "")
+    .replace(/\u2011/g, "-") // non-breaking hyphen
+    .replace(/\u2013/g, "-") // en-dash
+    .replace(/\u2014/g, "-") // em-dash
+    .replace(/\u2212/g, "-") // minus sign
+    .replace(/\u00AD/g, "")  // soft hyphen
+    .replace(/[\u2018\u2019\u201A\u2032]/g, "'")
+    .replace(/[\u201C\u201D\u201E\u2033]/g, '"')
+    .replace(/\u2026/g, "...")
+    .replace(/\u00A0/g, " ");
+}
+
+
 export async function generateQuotePdf(input: QuotePdfInput): Promise<Uint8Array> {
   const doc = await PDFDocument.create();
   const page = doc.addPage([595.28, 841.89]); // A4
@@ -44,7 +58,7 @@ export async function generateQuotePdf(input: QuotePdfInput): Promise<Uint8Array
     yy: number,
     opts: { size?: number; font?: typeof font; color?: ReturnType<typeof rgb> } = {},
   ) => {
-    page.drawText(text, {
+    page.drawText(normalizeText(text), {
       x,
       y: yy,
       size: opts.size ?? 10,
@@ -70,8 +84,9 @@ export async function generateQuotePdf(input: QuotePdfInput): Promise<Uint8Array
 
   let ry = y;
   for (const l of rightLines) {
-    const w = l.font.widthOfTextAtSize(l.text, l.size);
+    const w = l.font.widthOfTextAtSize(normalizeText(l.text), l.size);
     draw(l.text, width - marginX - w, ry, { size: l.size, font: l.font, color: l.color });
+
     ry -= l.size + 2;
   }
 
@@ -188,7 +203,7 @@ export async function generateQuotePdf(input: QuotePdfInput): Promise<Uint8Array
     let cur = "";
     for (const w of words) {
       const test = cur ? cur + " " + w : w;
-      if (font.widthOfTextAtSize(test, size) > maxWidth) {
+      if (font.widthOfTextAtSize(normalizeText(test), size) > maxWidth) {
         if (cur) lines.push(cur);
         cur = w;
       } else {
