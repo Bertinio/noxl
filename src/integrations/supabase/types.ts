@@ -293,6 +293,7 @@ export type Database = {
           title: string
           total_price: number
           updated_at: string
+          vat_rate: number
         }
         Insert: {
           created_at?: string
@@ -303,6 +304,7 @@ export type Database = {
           title: string
           total_price?: number
           updated_at?: string
+          vat_rate?: number
         }
         Update: {
           created_at?: string
@@ -313,6 +315,7 @@ export type Database = {
           title?: string
           total_price?: number
           updated_at?: string
+          vat_rate?: number
         }
         Relationships: [
           {
