@@ -199,7 +199,7 @@ export const getProject = createServerFn({ method: "GET" })
   .handler(async ({ data, context }) => {
     const { data: project, error } = await context.supabase
       .from("projects")
-      .select("id, title, description, status, total_price, created_at, customer_id, customers(id, name, email, company, address)")
+      .select("id, title, description, status, total_price, created_at, customer_id, vat_rate, customers(id, name, email, company, address)")
       .eq("id", data.id)
       .maybeSingle();
     if (error) throw new Error(error.message);
@@ -224,12 +224,31 @@ export const getProject = createServerFn({ method: "GET" })
         total_price: project.total_price,
         created_at: project.created_at,
         customer_id: project.customer_id,
+        vat_rate: Number((project as { vat_rate?: number }).vat_rate ?? 21),
       },
       customer,
       configurations: configs ?? [],
       quotes: quotes ?? [],
     };
   });
+
+export const updateProjectVatRate = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z.object({
+      id: z.string().uuid(),
+      vat_rate: z.union([z.literal(6), z.literal(21)]),
+    }).parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    const { error } = await context.supabase
+      .from("projects")
+      .update({ vat_rate: data.vat_rate })
+      .eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
 
 export const createProject = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
