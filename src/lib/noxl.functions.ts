@@ -525,7 +525,7 @@ export const getQuote = createServerFn({ method: "GET" })
   .handler(async ({ data, context }) => {
     const { data: quote, error } = await context.supabase
       .from("project_quotes")
-      .select("id, quote_number, total_price, created_at, project_id, projects(id, title, description, customers(name, email, company, address))")
+      .select("id, quote_number, total_price, created_at, project_id, projects(id, title, description, vat_rate, customers(name, email, company, address))")
       .eq("id", data.id)
       .maybeSingle();
     if (error) throw new Error(error.message);
@@ -546,12 +546,18 @@ export const getQuote = createServerFn({ method: "GET" })
         project_id: quote.project_id,
       },
       project: project
-        ? { id: project.id, title: project.title, description: project.description }
+        ? {
+            id: project.id,
+            title: project.title,
+            description: project.description,
+            vat_rate: Number((project as { vat_rate?: number }).vat_rate ?? 21),
+          }
         : null,
       customer,
       items: items ?? [],
     };
   });
+
 
 // ---------- resend quote email ----------
 export const resendQuoteEmail = createServerFn({ method: "POST" })
