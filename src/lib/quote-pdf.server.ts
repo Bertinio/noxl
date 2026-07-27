@@ -158,7 +158,7 @@ export async function generateQuotePdf(input: QuotePdfInput): Promise<Uint8Array
   page.drawLine({ start: { x: marginX, y: y + 4 }, end: { x: width - marginX, y: y + 4 }, thickness: 1.5, color: black });
   y -= 14;
   const subtotal = Number(input.totalPrice);
-  const vatRate = Number(input.installer?.vat_rate ?? 21);
+  const vatRate = Number(input.project?.vat_rate ?? 21);
   const vatAmount = subtotal * (vatRate / 100);
   const totalIncl = subtotal + vatAmount;
   draw("Subtotaal", colX.price, y);
