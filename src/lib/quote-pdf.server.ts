@@ -156,8 +156,20 @@ export async function generateQuotePdf(input: QuotePdfInput): Promise<Uint8Array
   y -= 8;
   page.drawLine({ start: { x: marginX, y: y + 4 }, end: { x: width - marginX, y: y + 4 }, thickness: 1.5, color: black });
   y -= 14;
-  draw("TOTAAL", colX.price, y, { font: bold });
-  draw(eur(Number(input.totalPrice)), colX.total, y, { font: bold });
+  const subtotal = Number(input.totalPrice);
+  const vatRate = Number(input.installer?.vat_rate ?? 21);
+  const vatAmount = subtotal * (vatRate / 100);
+  const totalIncl = subtotal + vatAmount;
+  draw("Subtotaal", colX.price, y);
+  draw(eur(subtotal), colX.total, y);
+  y -= 14;
+  draw(`BTW (${vatRate}%)`, colX.price, y);
+  draw(eur(vatAmount), colX.total, y);
+  y -= 14;
+  page.drawLine({ start: { x: colX.price - 10, y: y + 8 }, end: { x: width - marginX, y: y + 8 }, thickness: 0.5, color: black });
+  draw("Totaal incl. BTW", colX.price, y, { font: bold });
+  draw(eur(totalIncl), colX.total, y, { font: bold });
+
 
   y -= 30;
   const termsText =
