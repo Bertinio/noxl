@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -61,6 +61,7 @@ function metrics(r: Row): string {
 
 export default function Configurator() {
   const { projectId } = Route.useParams();
+  const qc = useQueryClient();
   const fetchProject = useServerFn(getProject);
   const fetchProducts = useServerFn(listProducts);
   const doSave = useServerFn(saveConfigurations);
@@ -116,7 +117,10 @@ export default function Configurator() {
           })),
         },
       }),
-    onSuccess: () => toast.success("Configuratie opgeslagen"),
+    onSuccess: () => {
+      toast.success("Configuratie opgeslagen");
+      qc.invalidateQueries({ queryKey: ["project", projectId] });
+    },
     onError: (e: Error) => toast.error(e.message),
   });
 
