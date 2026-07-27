@@ -128,8 +128,14 @@ function QuotePrint() {
             </tfoot>
           </table>
 
-          <div className="mt-8 text-xs text-black/70">
-            Deze offerte is een indicatie. Prijzen zijn exclusief btw tenzij anders vermeld.
+          <div className="mt-8 border-t border-black/30 pt-4">
+            <div className="text-xs uppercase tracking-wider mb-2 font-semibold" style={{ color: "#666" }}>
+              Algemene voorwaarden
+            </div>
+            <div className="whitespace-pre-line text-[11px] leading-relaxed" style={{ color: "#666" }}>
+              {(settings as { terms?: string | null } | undefined)?.terms?.trim() ||
+                "Deze offerte is geldig gedurende 30 dagen na uitgifte. Prijzen zijn exclusief btw tenzij anders vermeld. Betaling: 30% voorschot bij bestelling, saldo bij oplevering."}
+            </div>
           </div>
         </div>
       </div>
