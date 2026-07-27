@@ -124,6 +124,7 @@ export type Database = {
           updated_at: string
           user_id: string
           vat_number: string | null
+          vat_rate: number
         }
         Insert: {
           address?: string | null
@@ -135,6 +136,7 @@ export type Database = {
           updated_at?: string
           user_id: string
           vat_number?: string | null
+          vat_rate?: number
         }
         Update: {
           address?: string | null
@@ -146,6 +148,7 @@ export type Database = {
           updated_at?: string
           user_id?: string
           vat_number?: string | null
+          vat_rate?: number
         }
         Relationships: []
       }

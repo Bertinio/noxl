@@ -33,16 +33,18 @@ function SettingsPage() {
     queryFn: () => fetchSettings(),
   });
 
-  const [form, setForm] = useState({ name: "", company: "", address: "", vat_number: "", terms: "" });
+  const [form, setForm] = useState({ name: "", company: "", address: "", vat_number: "", terms: "", vat_rate: 21 as 6 | 21 });
 
   useEffect(() => {
     if (data) {
+      const rate = Number((data as { vat_rate?: number }).vat_rate ?? 21);
       setForm({
         name: data.name ?? "",
         company: data.company ?? "",
         address: data.address ?? "",
         vat_number: data.vat_number ?? "",
         terms: (data as { terms?: string | null }).terms ?? "",
+        vat_rate: rate === 6 ? 6 : 21,
       });
     }
   }, [data]);
@@ -56,6 +58,7 @@ function SettingsPage() {
           address: form.address.trim() || null,
           vat_number: form.vat_number.trim() || null,
           terms: form.terms.trim() || null,
+          vat_rate: form.vat_rate,
         },
       }),
     onSuccess: () => {
@@ -64,6 +67,7 @@ function SettingsPage() {
     },
     onError: (e: Error) => toast.error(e.message),
   });
+
 
   if (isLoading) {
     return <div className="flex min-h-screen items-center justify-center"><Loader2 className="h-6 w-6 animate-spin" /></div>;
@@ -124,6 +128,22 @@ function SettingsPage() {
                 />
               </div>
               <div className="grid gap-1.5 pt-4 border-t">
+                <Label htmlFor="vat_rate" className="text-base font-semibold">BTW-tarief</Label>
+                <p className="text-xs text-muted-foreground">
+                  Dit tarief wordt automatisch toegepast op alle nieuwe en bestaande offertes.
+                </p>
+                <select
+                  id="vat_rate"
+                  value={form.vat_rate}
+                  onChange={(e) => setForm((f) => ({ ...f, vat_rate: Number(e.target.value) === 6 ? 6 : 21 }))}
+                  className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+                >
+                  <option value={6}>6%</option>
+                  <option value={21}>21%</option>
+                </select>
+              </div>
+              <div className="grid gap-1.5 pt-4 border-t">
+
                 <Label htmlFor="terms" className="text-base font-semibold">Algemene voorwaarden</Label>
                 <p className="text-xs text-muted-foreground">
                   Deze tekst verschijnt onderaan elke offerte-PDF en op de offerte-detailpagina.

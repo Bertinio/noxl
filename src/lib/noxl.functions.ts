@@ -45,7 +45,9 @@ const installerSettingsSchema = z.object({
   address: z.string().trim().max(500).optional().nullable(),
   vat_number: z.string().trim().max(50).optional().nullable(),
   terms: z.string().trim().max(10000).optional().nullable(),
+  vat_rate: z.union([z.literal(6), z.literal(21)]).optional(),
 });
+
 
 export const getInstallerSettings = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -53,11 +55,12 @@ export const getInstallerSettings = createServerFn({ method: "GET" })
     const { supabase, userId } = context;
     const { data, error } = await supabase
       .from("installer_settings")
-      .select("user_id, name, company, address, vat_number, unit_price, terms")
+      .select("user_id, name, company, address, vat_number, unit_price, terms, vat_rate")
       .eq("user_id", userId)
       .maybeSingle();
     if (error) throw new Error(error.message);
-    return data ?? { user_id: userId, name: null, company: null, address: null, vat_number: null, unit_price: 150, terms: null };
+    return data ?? { user_id: userId, name: null, company: null, address: null, vat_number: null, unit_price: 150, terms: null, vat_rate: 21 };
+
   });
 
 export const updateInstallerSettings = createServerFn({ method: "POST" })
@@ -75,10 +78,12 @@ export const updateInstallerSettings = createServerFn({ method: "POST" })
           address: data.address ?? null,
           vat_number: data.vat_number ?? null,
           terms: data.terms ?? null,
+          ...(data.vat_rate !== undefined ? { vat_rate: data.vat_rate } : {}),
         },
         { onConflict: "user_id" },
       );
     if (error) throw new Error(error.message);
+
     return { ok: true };
   });
 
