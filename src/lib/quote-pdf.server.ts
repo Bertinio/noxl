@@ -84,8 +84,9 @@ export async function generateQuotePdf(input: QuotePdfInput): Promise<Uint8Array
 
   let ry = y;
   for (const l of rightLines) {
-    const w = l.font.widthOfTextAtSize(l.text, l.size);
+    const w = l.font.widthOfTextAtSize(normalizeText(l.text), l.size);
     draw(l.text, width - marginX - w, ry, { size: l.size, font: l.font, color: l.color });
+
     ry -= l.size + 2;
   }
 
