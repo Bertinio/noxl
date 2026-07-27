@@ -61,6 +61,7 @@ function metrics(r: Row): string {
 
 export default function Configurator() {
   const { projectId } = Route.useParams();
+  const qc = useQueryClient();
   const fetchProject = useServerFn(getProject);
   const fetchProducts = useServerFn(listProducts);
   const doSave = useServerFn(saveConfigurations);
