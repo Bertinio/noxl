@@ -44,6 +44,16 @@ function ProjectDetail() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const vatMut = useMutation({
+    mutationFn: (vat_rate: 6 | 21) => doUpdateVat({ data: { id, vat_rate } }),
+    onSuccess: () => {
+      toast.success("BTW-tarief bijgewerkt");
+      qc.invalidateQueries({ queryKey: ["project", id] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+
   if (isLoading) return <div className="flex min-h-screen items-center justify-center"><Loader2 className="h-6 w-6 animate-spin" /></div>;
   if (!data) return null;
   const p = data.project;
