@@ -17,7 +17,7 @@ type QuotePdfInput = {
   totalPrice: number;
   customer: { name: string; email: string; company: string | null; address: string | null } | null;
   project: { title: string; description: string | null } | null;
-  installer?: { name: string | null; company: string | null; address: string | null; vat_number: string | null } | null;
+  installer?: { name: string | null; company: string | null; address: string | null; vat_number: string | null; terms?: string | null } | null;
   items: Item[];
 };
 
@@ -159,13 +159,42 @@ export async function generateQuotePdf(input: QuotePdfInput): Promise<Uint8Array
   draw("TOTAAL", colX.price, y, { font: bold });
   draw(eur(Number(input.totalPrice)), colX.total, y, { font: bold });
 
-  y -= 40;
-  draw(
-    "Deze offerte is een indicatie. Prijzen zijn exclusief btw tenzij anders vermeld.",
-    marginX,
-    y,
-    { size: 8, color: gray },
-  );
+  y -= 30;
+  const termsText =
+    (input.installer?.terms && input.installer.terms.trim()) ||
+    "Deze offerte is geldig gedurende 30 dagen na uitgifte. Prijzen zijn exclusief btw tenzij anders vermeld. Betaling: 30% voorschot bij bestelling, saldo bij oplevering.";
+
+  const termsGray = rgb(0.4, 0.4, 0.4);
+  draw("ALGEMENE VOORWAARDEN", marginX, y, { size: 9, font: bold, color: termsGray });
+  y -= 14;
+
+  const maxWidth = width - 2 * marginX;
+  const wrapLine = (line: string, size: number): string[] => {
+    const words = line.split(/\s+/);
+    const lines: string[] = [];
+    let cur = "";
+    for (const w of words) {
+      const test = cur ? cur + " " + w : w;
+      if (font.widthOfTextAtSize(test, size) > maxWidth) {
+        if (cur) lines.push(cur);
+        cur = w;
+      } else {
+        cur = test;
+      }
+    }
+    if (cur) lines.push(cur);
+    return lines.length ? lines : [""];
+  };
+
+  const size = 8;
+  for (const raw of termsText.split(/\r?\n/)) {
+    for (const wrapped of wrapLine(raw, size)) {
+      if (y < 40) break;
+      draw(wrapped, marginX, y, { size, color: termsGray });
+      y -= size + 3;
+    }
+    if (y < 40) break;
+  }
 
   return await doc.save();
 }

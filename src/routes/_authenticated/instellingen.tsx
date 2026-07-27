@@ -33,7 +33,7 @@ function SettingsPage() {
     queryFn: () => fetchSettings(),
   });
 
-  const [form, setForm] = useState({ name: "", company: "", address: "", vat_number: "" });
+  const [form, setForm] = useState({ name: "", company: "", address: "", vat_number: "", terms: "" });
 
   useEffect(() => {
     if (data) {
@@ -42,6 +42,7 @@ function SettingsPage() {
         company: data.company ?? "",
         address: data.address ?? "",
         vat_number: data.vat_number ?? "",
+        terms: (data as { terms?: string | null }).terms ?? "",
       });
     }
   }, [data]);
@@ -54,6 +55,7 @@ function SettingsPage() {
           company: form.company.trim() || null,
           address: form.address.trim() || null,
           vat_number: form.vat_number.trim() || null,
+          terms: form.terms.trim() || null,
         },
       }),
     onSuccess: () => {
@@ -119,6 +121,20 @@ function SettingsPage() {
                   value={form.vat_number}
                   onChange={(e) => setForm((f) => ({ ...f, vat_number: e.target.value }))}
                   placeholder="BE0123.456.789"
+                />
+              </div>
+              <div className="grid gap-1.5 pt-4 border-t">
+                <Label htmlFor="terms" className="text-base font-semibold">Algemene voorwaarden</Label>
+                <p className="text-xs text-muted-foreground">
+                  Deze tekst verschijnt onderaan elke offerte-PDF en op de offerte-detailpagina.
+                </p>
+                <Textarea
+                  id="terms"
+                  value={form.terms}
+                  onChange={(e) => setForm((f) => ({ ...f, terms: e.target.value }))}
+                  placeholder={`1. Deze offerte is geldig gedurende 30 dagen na uitgifte.\n2. Prijzen zijn exclusief btw tenzij anders vermeld.\n3. Betaling: 30% voorschot bij bestelling, saldo bij oplevering.\n4. Uitvoeringstermijn: in onderling overleg te bepalen.\n5. Klachten dienen binnen 8 dagen na levering schriftelijk gemeld te worden.\n6. Op deze offerte is het Belgisch recht van toepassing.`}
+                  rows={10}
+                  className="font-mono text-sm"
                 />
               </div>
               <div>

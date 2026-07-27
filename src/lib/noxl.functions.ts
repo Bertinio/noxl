@@ -44,6 +44,7 @@ const installerSettingsSchema = z.object({
   company: z.string().trim().max(200).optional().nullable(),
   address: z.string().trim().max(500).optional().nullable(),
   vat_number: z.string().trim().max(50).optional().nullable(),
+  terms: z.string().trim().max(10000).optional().nullable(),
 });
 
 export const getInstallerSettings = createServerFn({ method: "GET" })
@@ -52,11 +53,11 @@ export const getInstallerSettings = createServerFn({ method: "GET" })
     const { supabase, userId } = context;
     const { data, error } = await supabase
       .from("installer_settings")
-      .select("user_id, name, company, address, vat_number, unit_price")
+      .select("user_id, name, company, address, vat_number, unit_price, terms")
       .eq("user_id", userId)
       .maybeSingle();
     if (error) throw new Error(error.message);
-    return data ?? { user_id: userId, name: null, company: null, address: null, vat_number: null, unit_price: 150 };
+    return data ?? { user_id: userId, name: null, company: null, address: null, vat_number: null, unit_price: 150, terms: null };
   });
 
 export const updateInstallerSettings = createServerFn({ method: "POST" })
@@ -73,6 +74,7 @@ export const updateInstallerSettings = createServerFn({ method: "POST" })
           company: data.company ?? null,
           address: data.address ?? null,
           vat_number: data.vat_number ?? null,
+          terms: data.terms ?? null,
         },
         { onConflict: "user_id" },
       );
