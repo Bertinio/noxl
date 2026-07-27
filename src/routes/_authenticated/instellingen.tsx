@@ -55,6 +55,7 @@ function SettingsPage() {
           company: form.company.trim() || null,
           address: form.address.trim() || null,
           vat_number: form.vat_number.trim() || null,
+          terms: form.terms.trim() || null,
         },
       }),
     onSuccess: () => {
