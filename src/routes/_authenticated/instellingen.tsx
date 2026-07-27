@@ -33,7 +33,7 @@ function SettingsPage() {
     queryFn: () => fetchSettings(),
   });
 
-  const [form, setForm] = useState({ name: "", company: "", address: "", vat_number: "" });
+  const [form, setForm] = useState({ name: "", company: "", address: "", vat_number: "", terms: "" });
 
   useEffect(() => {
     if (data) {
@@ -42,6 +42,7 @@ function SettingsPage() {
         company: data.company ?? "",
         address: data.address ?? "",
         vat_number: data.vat_number ?? "",
+        terms: (data as { terms?: string | null }).terms ?? "",
       });
     }
   }, [data]);
