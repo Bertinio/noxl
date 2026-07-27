@@ -16,8 +16,9 @@ type QuotePdfInput = {
   createdAt: string;
   totalPrice: number;
   customer: { name: string; email: string; company: string | null; address: string | null } | null;
-  project: { title: string; description: string | null } | null;
-  installer?: { name: string | null; company: string | null; address: string | null; vat_number: string | null; terms?: string | null; vat_rate?: number | null } | null;
+  project: { title: string; description: string | null; vat_rate?: number | null } | null;
+  installer?: { name: string | null; company: string | null; address: string | null; vat_number: string | null; terms?: string | null } | null;
+
   items: Item[];
 };
 
@@ -157,7 +158,7 @@ export async function generateQuotePdf(input: QuotePdfInput): Promise<Uint8Array
   page.drawLine({ start: { x: marginX, y: y + 4 }, end: { x: width - marginX, y: y + 4 }, thickness: 1.5, color: black });
   y -= 14;
   const subtotal = Number(input.totalPrice);
-  const vatRate = Number(input.installer?.vat_rate ?? 21);
+  const vatRate = Number(input.project?.vat_rate ?? 21);
   const vatAmount = subtotal * (vatRate / 100);
   const totalIncl = subtotal + vatAmount;
   draw("Subtotaal", colX.price, y);

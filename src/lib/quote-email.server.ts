@@ -12,10 +12,11 @@ export async function sendQuoteEmailWithSupabase(
   const { data: quote, error: qErr } = await supabase
     .from("project_quotes")
     .select(
-      "id, quote_number, total_price, created_at, project_id, projects(title, description, customers(name, email, company, address, owner_id))",
+      "id, quote_number, total_price, created_at, project_id, projects(title, description, vat_rate, customers(name, email, company, address, owner_id))",
     )
     .eq("id", quote_id)
     .maybeSingle();
+
   if (qErr) throw new Error(qErr.message);
   if (!quote) throw new Error("Offerte niet gevonden");
 
@@ -39,17 +40,17 @@ export async function sendQuoteEmailWithSupabase(
     address: string | null;
     vat_number: string | null;
     terms: string | null;
-    vat_rate: number | null;
   } | null = null;
   const ownerId = customer.owner_id ?? null;
   if (ownerId) {
     const { data: s } = await supabase
       .from("installer_settings")
-      .select("name, company, address, vat_number, terms, vat_rate")
+      .select("name, company, address, vat_number, terms")
       .eq("user_id", ownerId)
       .maybeSingle();
     if (s) installer = s;
   }
+
 
 
   const pdfBytes = await generateQuotePdf({
@@ -57,7 +58,7 @@ export async function sendQuoteEmailWithSupabase(
     createdAt: quote.created_at,
     totalPrice: Number(quote.total_price),
     customer: customer ?? null,
-    project: project ? { title: project.title, description: project.description } : null,
+    project: project ? { title: project.title, description: project.description, vat_rate: Number((project as { vat_rate?: number }).vat_rate ?? 21) } : null,
     installer,
     items: (items ?? []).map((it) => ({
       description: it.description,

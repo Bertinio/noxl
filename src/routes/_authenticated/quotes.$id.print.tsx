@@ -123,7 +123,7 @@ function QuotePrint() {
             <tfoot>
               {(() => {
                 const subtotal = Number(q.total_price);
-                const vatRate = Number((settings as { vat_rate?: number } | undefined)?.vat_rate ?? 21);
+                const vatRate = Number((project as { vat_rate?: number } | null)?.vat_rate ?? 21);
                 const vat = subtotal * (vatRate / 100);
                 const total = subtotal + vat;
                 return (
@@ -144,6 +144,7 @@ function QuotePrint() {
                 );
               })()}
             </tfoot>
+
 
           </table>
 

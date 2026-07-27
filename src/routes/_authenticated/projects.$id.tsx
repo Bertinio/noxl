@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Toaster } from "@/components/ui/sonner";
-import { getProject, generateQuote } from "@/lib/noxl.functions";
+import { getProject, generateQuote, updateProjectVatRate } from "@/lib/noxl.functions";
 
 export const Route = createFileRoute("/_authenticated/projects/$id")({
   head: () => ({ meta: [{ title: "Project — NoXL" }] }),
@@ -24,6 +24,8 @@ function ProjectDetail() {
   const qc = useQueryClient();
   const fetchProject = useServerFn(getProject);
   const doGenerate = useServerFn(generateQuote);
+  const doUpdateVat = useServerFn(updateProjectVatRate);
+
 
   const { data, isLoading } = useQuery({
     queryKey: ["project", id],
@@ -41,6 +43,16 @@ function ProjectDetail() {
     },
     onError: (e: Error) => toast.error(e.message),
   });
+
+  const vatMut = useMutation({
+    mutationFn: (vat_rate: 6 | 21) => doUpdateVat({ data: { id, vat_rate } }),
+    onSuccess: () => {
+      toast.success("BTW-tarief bijgewerkt");
+      qc.invalidateQueries({ queryKey: ["project", id] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
 
   if (isLoading) return <div className="flex min-h-screen items-center justify-center"><Loader2 className="h-6 w-6 animate-spin" /></div>;
   if (!data) return null;
@@ -73,6 +85,43 @@ function ProjectDetail() {
           </CardHeader>
           {p.description && <CardContent className="text-sm text-muted-foreground">{p.description}</CardContent>}
         </Card>
+
+        <Card>
+          <CardHeader><CardTitle>BTW-tarief voor dit project</CardTitle></CardHeader>
+          <CardContent>
+            {(() => {
+              const vatRate = Number(p.vat_rate ?? 21);
+              const subtotal = data.configurations.reduce((s, c) => s + Number(c.total_price ?? 0), 0);
+              const vatAmount = subtotal * (vatRate / 100);
+              const totalIncl = subtotal + vatAmount;
+              return (
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="grid gap-1.5">
+                    <label htmlFor="vat_rate" className="text-sm font-medium">BTW-tarief</label>
+                    <select
+                      id="vat_rate"
+                      value={vatRate}
+                      disabled={vatMut.isPending}
+                      onChange={(e) => vatMut.mutate(Number(e.target.value) === 6 ? 6 : 21)}
+                      className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+                    >
+                      <option value={6}>6%</option>
+                      <option value={21}>21%</option>
+                    </select>
+                  </div>
+                  <div className="rounded-md border p-4 text-sm">
+                    <div className="flex justify-between py-1"><span>Subtotaal</span><span>{currency.format(subtotal)}</span></div>
+                    <div className="flex justify-between py-1"><span>BTW ({vatRate}%)</span><span>{currency.format(vatAmount)}</span></div>
+                    <div className="mt-1 flex justify-between border-t pt-2 font-semibold"><span>Totaal incl. BTW</span><span>{currency.format(totalIncl)}</span></div>
+                  </div>
+                </div>
+              );
+            })()}
+          </CardContent>
+        </Card>
+
+
+
 
         <Card>
           <CardHeader><CardTitle>Configuratie</CardTitle></CardHeader>
