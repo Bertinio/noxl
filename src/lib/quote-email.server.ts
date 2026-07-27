@@ -58,7 +58,7 @@ export async function sendQuoteEmailWithSupabase(
     createdAt: quote.created_at,
     totalPrice: Number(quote.total_price),
     customer: customer ?? null,
-    project: project ? { title: project.title, description: project.description } : null,
+    project: project ? { title: project.title, description: project.description, vat_rate: Number((project as { vat_rate?: number }).vat_rate ?? 21) } : null,
     installer,
     items: (items ?? []).map((it) => ({
       description: it.description,
