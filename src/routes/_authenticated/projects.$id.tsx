@@ -118,6 +118,9 @@ function ProjectDetail() {
               );
             })()}
           </CardContent>
+        </Card>
+
+
 
 
         <Card>
