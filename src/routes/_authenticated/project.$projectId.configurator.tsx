@@ -117,7 +117,10 @@ export default function Configurator() {
           })),
         },
       }),
-    onSuccess: () => toast.success("Configuratie opgeslagen"),
+    onSuccess: () => {
+      toast.success("Configuratie opgeslagen");
+      qc.invalidateQueries({ queryKey: ["project", projectId] });
+    },
     onError: (e: Error) => toast.error(e.message),
   });
 
