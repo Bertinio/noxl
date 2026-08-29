@@ -695,32 +695,37 @@ async function countRoleHolders(_sb: SB, role: AppRole): Promise<number> {
 
 async function computeInstallerStats(sb: SB, installerId: string) {
   // Quotes are attributed to an installer via projects → customers.owner_id.
+  const empty = { generated: 0, sent: 0, open: 0, last_quote_at: null as string | null };
   const { data: customers } = await sb
     .from("customers")
     .select("id")
     .eq("owner_id", installerId);
   const custIds = (customers ?? []).map((c) => c.id);
-  if (custIds.length === 0) return { generated: 0, sent: 0 };
+  if (custIds.length === 0) return empty;
 
   const { data: projects } = await sb
     .from("projects")
     .select("id")
     .in("customer_id", custIds);
   const projIds = (projects ?? []).map((p) => p.id);
-  if (projIds.length === 0) return { generated: 0, sent: 0 };
+  if (projIds.length === 0) return empty;
 
-  const { count: generated } = await sb
+  const { data: quotes } = await sb
     .from("project_quotes")
-    .select("id", { count: "exact", head: true })
-    .in("project_id", projIds);
-  const { count: sent } = await sb
-    .from("project_quotes")
-    .select("id", { count: "exact", head: true })
+    .select("id, created_at, last_email_sent_at")
     .in("project_id", projIds)
-    .not("last_email_sent_at", "is", null);
+    .order("created_at", { ascending: false });
+  const rows = quotes ?? [];
+  const sent = rows.filter((q) => q.last_email_sent_at !== null).length;
 
-  return { generated: generated ?? 0, sent: sent ?? 0 };
+  return {
+    generated: rows.length,
+    sent,
+    open: rows.length - sent,
+    last_quote_at: rows[0]?.created_at ?? null,
+  };
 }
+
 
 export const listInstallers = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
