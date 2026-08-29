@@ -695,32 +695,37 @@ async function countRoleHolders(_sb: SB, role: AppRole): Promise<number> {
 
 async function computeInstallerStats(sb: SB, installerId: string) {
   // Quotes are attributed to an installer via projects → customers.owner_id.
+  const empty = { generated: 0, sent: 0, open: 0, last_quote_at: null as string | null };
   const { data: customers } = await sb
     .from("customers")
     .select("id")
     .eq("owner_id", installerId);
   const custIds = (customers ?? []).map((c) => c.id);
-  if (custIds.length === 0) return { generated: 0, sent: 0 };
+  if (custIds.length === 0) return empty;
 
   const { data: projects } = await sb
     .from("projects")
     .select("id")
     .in("customer_id", custIds);
   const projIds = (projects ?? []).map((p) => p.id);
-  if (projIds.length === 0) return { generated: 0, sent: 0 };
+  if (projIds.length === 0) return empty;
 
-  const { count: generated } = await sb
+  const { data: quotes } = await sb
     .from("project_quotes")
-    .select("id", { count: "exact", head: true })
-    .in("project_id", projIds);
-  const { count: sent } = await sb
-    .from("project_quotes")
-    .select("id", { count: "exact", head: true })
+    .select("id, created_at, last_email_sent_at")
     .in("project_id", projIds)
-    .not("last_email_sent_at", "is", null);
+    .order("created_at", { ascending: false });
+  const rows = quotes ?? [];
+  const sent = rows.filter((q) => q.last_email_sent_at !== null).length;
 
-  return { generated: generated ?? 0, sent: sent ?? 0 };
+  return {
+    generated: rows.length,
+    sent,
+    open: rows.length - sent,
+    last_quote_at: rows[0]?.created_at ?? null,
+  };
 }
+
 
 export const listInstallers = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -742,13 +747,17 @@ export const listInstallers = createServerFn({ method: "GET" })
       rolesByUser.set(r.user_id, arr);
     }
 
+    // All users are installers or admins — show both in the management list.
     const installerIds = (userList?.users ?? [])
-      .filter((u) => (rolesByUser.get(u.id) ?? []).includes("installer"))
+      .filter((u) => {
+        const r = rolesByUser.get(u.id) ?? [];
+        return r.includes("installer") || r.includes("admin");
+      })
       .map((u) => u.id);
 
     const { data: settings } = await supabaseAdmin
       .from("installer_settings")
-      .select("user_id, name, company")
+      .select("user_id, name, company, active")
       .in("user_id", installerIds.length > 0 ? installerIds : ["00000000-0000-0000-0000-000000000000"]);
     const settingsByUser = new Map(
       (settings ?? []).map((s) => [s.user_id, s] as const),
@@ -759,6 +768,8 @@ export const listInstallers = createServerFn({ method: "GET" })
         const u = userList!.users.find((x) => x.id === id)!;
         const s = settingsByUser.get(id) ?? null;
         const stats = await computeInstallerStats(supabaseAdmin as unknown as SB, id);
+        const banned = Boolean((u as { banned_until?: string | null }).banned_until
+          && new Date((u as { banned_until?: string | null }).banned_until as string) > new Date());
         return {
           id: u.id,
           email: u.email ?? "",
@@ -766,11 +777,15 @@ export const listInstallers = createServerFn({ method: "GET" })
           company: s?.company ?? null,
           roles: rolesByUser.get(u.id) ?? [],
           last_sign_in_at: u.last_sign_in_at ?? null,
+          active: (s?.active ?? true) && !banned,
           generated: stats.generated,
           sent: stats.sent,
+          open: stats.open,
+          last_quote_at: stats.last_quote_at,
         };
       }),
     );
+
 
     return { installers: rows };
   });
@@ -934,5 +949,209 @@ export const updateUserRole = createServerFn({ method: "POST" })
       .insert({ user_id: data.user_id, role: data.role });
     if (insErr) return { ok: false as const, message: insErr.message };
 
+    return { ok: true as const };
+  });
+
+// ---------- installer lifecycle (admin only) ----------
+const BAN_FOREVER = "876000h"; // ~100 years
+
+// Create a brand-new installer account + profile + role.
+export const createInstaller = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z.object({
+      email: z.string().trim().email().max(255),
+      name: z.string().trim().max(200).optional().nullable(),
+      company: z.string().trim().max(200).optional().nullable(),
+    }).parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    await requireAdmin(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: list } = await supabaseAdmin.auth.admin.listUsers();
+    const existing = list?.users?.find(
+      (u) => u.email?.toLowerCase() === data.email.toLowerCase(),
+    );
+    let userId = existing?.id ?? null;
+
+    if (!userId) {
+      const { data: created, error } = await supabaseAdmin.auth.admin.createUser({
+        email: data.email,
+        email_confirm: true,
+        password: crypto.randomUUID() + "Aa1!",
+      });
+      if (error) return { ok: false as const, message: error.message };
+      userId = created.user?.id ?? null;
+      if (!userId) return { ok: false as const, message: "Aanmaken mislukt" };
+    }
+
+    const { error: sErr } = await supabaseAdmin
+      .from("installer_settings")
+      .upsert(
+        {
+          user_id: userId,
+          name: data.name ?? null,
+          company: data.company ?? null,
+          active: true,
+        },
+        { onConflict: "user_id" },
+      );
+    if (sErr) return { ok: false as const, message: sErr.message };
+
+    const { error: rErr } = await supabaseAdmin
+      .from("user_roles")
+      .upsert({ user_id: userId, role: "installer" }, { onConflict: "user_id,role" });
+    if (rErr) return { ok: false as const, message: rErr.message };
+
+    // Recovery link so the new installer can set a password.
+    let link: string | null = null;
+    const { data: gen } = await supabaseAdmin.auth.admin.generateLink({
+      type: "recovery",
+      email: data.email,
+    });
+    link = gen?.properties?.action_link ?? null;
+
+    return { ok: true as const, user_id: userId, reset_link: link, existed: Boolean(existing) };
+  });
+
+// Activate / deactivate: flips installer_settings.active AND bans the auth user
+// so a deactivated installer can no longer sign in.
+export const toggleInstallerActive = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z.object({ user_id: z.string().uuid(), active: z.boolean().optional() }).parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    await requireAdmin(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: row } = await supabaseAdmin
+      .from("installer_settings")
+      .select("active")
+      .eq("user_id", data.user_id)
+      .maybeSingle();
+    const current = row?.active ?? true;
+    const next = data.active ?? !current;
+
+    if (!next) {
+      // Never lock out the last admin.
+      const { data: roles } = await supabaseAdmin
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", data.user_id);
+      const isAdmin = (roles ?? []).some((r) => r.role === "admin");
+      if (isAdmin) {
+        const adminCount = await countRoleHolders(context.supabase, "admin");
+        if (adminCount <= 1) {
+          return { ok: false as const, message: "Kan de laatste beheerder niet deactiveren" };
+        }
+      }
+    }
+
+    const { error: sErr } = await supabaseAdmin
+      .from("installer_settings")
+      .upsert({ user_id: data.user_id, active: next }, { onConflict: "user_id" });
+    if (sErr) return { ok: false as const, message: sErr.message };
+
+    const { error: aErr } = await supabaseAdmin.auth.admin.updateUserById(data.user_id, {
+      ban_duration: next ? "none" : BAN_FOREVER,
+    });
+    if (aErr) return { ok: false as const, message: aErr.message };
+
+    return { ok: true as const, active: next };
+  });
+
+// Generate a password-recovery link for an installer. No email is sent from
+// the backend; the admin copies the link from the UI.
+export const resetInstallerPassword = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({ user_id: z.string().uuid() }).parse(i))
+  .handler(async ({ data, context }) => {
+    await requireAdmin(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: userRes, error: uErr } = await supabaseAdmin.auth.admin.getUserById(data.user_id);
+    if (uErr) return { ok: false as const, message: uErr.message };
+    const email = userRes?.user?.email;
+    if (!email) return { ok: false as const, message: "Gebruiker heeft geen e-mailadres" };
+
+    const { data: gen, error } = await supabaseAdmin.auth.admin.generateLink({
+      type: "recovery",
+      email,
+    });
+    if (error) return { ok: false as const, message: error.message };
+    const link = gen?.properties?.action_link ?? null;
+    if (!link) return { ok: false as const, message: "Kon geen reset-link genereren" };
+    return { ok: true as const, link, email };
+  });
+
+// Robust role switch limited to admin | installer.
+export const updateInstallerRole = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z.object({
+      user_id: z.string().uuid(),
+      role: z.enum(["admin", "installer"]),
+    }).parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    await requireAdmin(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: current } = await supabaseAdmin
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", data.user_id);
+    const currentRoles = new Set((current ?? []).map((r) => r.role as AppRole));
+
+    if (currentRoles.has("admin") && data.role !== "admin") {
+      const adminCount = await countRoleHolders(context.supabase, "admin");
+      if (adminCount <= 1) {
+        return { ok: false as const, message: "Kan de laatste beheerder niet verwijderen" };
+      }
+    }
+
+    const { error: delErr } = await supabaseAdmin
+      .from("user_roles")
+      .delete()
+      .eq("user_id", data.user_id);
+    if (delErr) return { ok: false as const, message: delErr.message };
+
+    const { error: insErr } = await supabaseAdmin
+      .from("user_roles")
+      .insert({ user_id: data.user_id, role: data.role });
+    if (insErr) return { ok: false as const, message: insErr.message };
+
+    return { ok: true as const, role: data.role };
+  });
+
+// Hard delete: auth user + roles + profile.
+export const deleteInstaller = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({ user_id: z.string().uuid() }).parse(i))
+  .handler(async ({ data, context }) => {
+    await requireAdmin(context.supabase, context.userId);
+    if (data.user_id === context.userId) {
+      return { ok: false as const, message: "Je kan je eigen account niet verwijderen" };
+    }
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: roles } = await supabaseAdmin
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", data.user_id);
+    if ((roles ?? []).some((r) => r.role === "admin")) {
+      const adminCount = await countRoleHolders(context.supabase, "admin");
+      if (adminCount <= 1) {
+        return { ok: false as const, message: "Kan de laatste beheerder niet verwijderen" };
+      }
+    }
+
+    await supabaseAdmin.from("user_roles").delete().eq("user_id", data.user_id);
+    await supabaseAdmin.from("installer_settings").delete().eq("user_id", data.user_id);
+
+    const { error } = await supabaseAdmin.auth.admin.deleteUser(data.user_id);
+    if (error) return { ok: false as const, message: error.message };
     return { ok: true as const };
   });
