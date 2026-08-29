@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
 import { toast } from "sonner";
-import { Loader2, Plus, Trash2, Pencil, ExternalLink } from "lucide-react";
+import { Loader2, Plus, Trash2, ExternalLink, KeyRound, Copy } from "lucide-react";
 import { AppShell } from "@/components/noxl/AppShell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,6 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import {
   Dialog,
   DialogContent,
@@ -30,30 +31,40 @@ import { Toaster } from "@/components/ui/sonner";
 import {
   getMyRole,
   listInstallers,
-  addInstaller,
-  removeInstaller,
-  updateUserRole,
+  createInstaller,
+  deleteInstaller,
+  updateInstallerRole,
+  toggleInstallerActive,
+  resetInstallerPassword,
 } from "@/lib/noxl.functions";
 
 export const Route = createFileRoute("/_authenticated/beheer/installateurs/")({
   head: () => ({
     meta: [
       { title: "Installateurs — NoXL" },
-      { name: "description", content: "Beheer installateursaccounts, rollen en offerte-statistieken." },
+      { name: "description", content: "Beheer installateursaccounts, rollen, status en offerte-statistieken." },
+      { property: "og:title", content: "Installateurs — NoXL" },
+      { property: "og:description", content: "Beheer installateursaccounts, rollen, status en offerte-statistieken." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
   component: InstallersPage,
 });
 
-type AppRole = "admin" | "installer" | "customer";
+type ManagedRole = "admin" | "installer";
+
+const dateFmt = (v: string | null) => (v ? new Date(v).toLocaleDateString("nl-BE") : "—");
 
 function InstallersPage() {
   const qc = useQueryClient();
   const fetchRole = useServerFn(getMyRole);
   const fetchList = useServerFn(listInstallers);
-  const doAdd = useServerFn(addInstaller);
-  const doRemove = useServerFn(removeInstaller);
-  const doUpdateRole = useServerFn(updateUserRole);
+  const doCreate = useServerFn(createInstaller);
+  const doDelete = useServerFn(deleteInstaller);
+  const doUpdateRole = useServerFn(updateInstallerRole);
+  const doToggle = useServerFn(toggleInstallerActive);
+  const doReset = useServerFn(resetInstallerPassword);
 
   const role = useQuery({ queryKey: ["my-role"], queryFn: () => fetchRole() });
   const list = useQuery({
@@ -63,50 +74,62 @@ function InstallersPage() {
   });
 
   const [addOpen, setAddOpen] = useState(false);
-  const [addEmail, setAddEmail] = useState("");
+  const [form, setForm] = useState({ email: "", name: "", company: "" });
+  const [resetLink, setResetLink] = useState<{ email: string; link: string } | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<{ id: string; email: string } | null>(null);
 
-  const [roleOpen, setRoleOpen] = useState(false);
-  const [roleTarget, setRoleTarget] = useState<{ id: string; email: string; current: AppRole } | null>(null);
+  const invalidate = () => qc.invalidateQueries({ queryKey: ["installers"] });
 
-  const addMut = useMutation({
-    mutationFn: (email: string) => doAdd({ data: { email } }),
+  const createMut = useMutation({
+    mutationFn: (v: { email: string; name: string | null; company: string | null }) =>
+      doCreate({ data: v }),
     onSuccess: (res) => {
-      if (res.ok) {
-        toast.success("Installateur toegevoegd");
-        setAddOpen(false);
-        setAddEmail("");
-        qc.invalidateQueries({ queryKey: ["installers"] });
-      } else {
-        toast.error(res.message);
-      }
+      if (!res.ok) return toast.error(res.message);
+      toast.success(res.existed ? "Bestaande gebruiker kreeg de rol installateur" : "Installateur aangemaakt");
+      setAddOpen(false);
+      setForm({ email: "", name: "", company: "" });
+      invalidate();
+      if (res.reset_link) setResetLink({ email: "", link: res.reset_link });
     },
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const removeMut = useMutation({
-    mutationFn: (user_id: string) => doRemove({ data: { user_id } }),
+  const deleteMut = useMutation({
+    mutationFn: (user_id: string) => doDelete({ data: { user_id } }),
     onSuccess: (res) => {
-      if (res.ok) {
-        toast.success("Installateur verwijderd");
-        qc.invalidateQueries({ queryKey: ["installers"] });
-      } else {
-        toast.error(res.message);
-      }
+      if (!res.ok) return toast.error(res.message);
+      toast.success("Installateur verwijderd");
+      setConfirmDelete(null);
+      invalidate();
     },
     onError: (e: Error) => toast.error(e.message),
   });
 
   const roleMut = useMutation({
-    mutationFn: (v: { user_id: string; role: AppRole }) => doUpdateRole({ data: v }),
+    mutationFn: (v: { user_id: string; role: ManagedRole }) => doUpdateRole({ data: v }),
     onSuccess: (res) => {
-      if (res.ok) {
-        toast.success("Rol bijgewerkt");
-        setRoleOpen(false);
-        setRoleTarget(null);
-        qc.invalidateQueries({ queryKey: ["installers"] });
-      } else {
-        toast.error(res.message);
-      }
+      if (!res.ok) return toast.error(res.message);
+      toast.success(`Rol bijgewerkt naar ${res.role}`);
+      invalidate();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const toggleMut = useMutation({
+    mutationFn: (v: { user_id: string; active: boolean }) => doToggle({ data: v }),
+    onSuccess: (res) => {
+      if (!res.ok) return toast.error(res.message);
+      toast.success(res.active ? "Installateur geactiveerd" : "Installateur gedeactiveerd");
+      invalidate();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const resetMut = useMutation({
+    mutationFn: (user_id: string) => doReset({ data: { user_id } }),
+    onSuccess: (res) => {
+      if (!res.ok) return toast.error(res.message);
+      setResetLink({ email: res.email, link: res.link });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -129,6 +152,15 @@ function InstallersPage() {
 
   const installers = list.data?.installers ?? [];
 
+  const currentRole = (roles: string[]): ManagedRole => (roles.includes("admin") ? "admin" : "installer");
+
+  const StatusBadge = ({ active }: { active: boolean }) =>
+    active ? (
+      <Badge className="bg-emerald-600 text-white hover:bg-emerald-600">Active</Badge>
+    ) : (
+      <Badge variant="secondary" className="text-muted-foreground">Gedeactiveerd</Badge>
+    );
+
   return (
     <AppShell role="admin" title="Installateurs">
       <Toaster position="top-right" richColors />
@@ -146,16 +178,19 @@ function InstallersPage() {
             </div>
           ) : (
             <>
-              <div className="hidden md:block">
+              <div className="hidden md:block overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>E-mail</TableHead>
                       <TableHead>Naam</TableHead>
-                      <TableHead>Rollen</TableHead>
+                      <TableHead>Rol</TableHead>
+                      <TableHead>Status</TableHead>
                       <TableHead>Laatste login</TableHead>
-                      <TableHead className="text-right">Gegenereerd</TableHead>
-                      <TableHead className="text-right">Verstuurd</TableHead>
+                      <TableHead>Laatste offerte</TableHead>
+                      <TableHead className="text-right">Gegen.</TableHead>
+                      <TableHead className="text-right">Verst.</TableHead>
+                      <TableHead className="text-right">Open</TableHead>
                       <TableHead className="text-right">Acties</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -173,50 +208,51 @@ function InstallersPage() {
                           </Link>
                         </TableCell>
                         <TableCell>{u.name ?? u.company ?? "—"}</TableCell>
-                        <TableCell className="space-x-1">
-                          {u.roles.length === 0 ? (
-                            <Badge variant="outline">Geen</Badge>
-                          ) : (
-                            u.roles.map((r) => (
-                              <Badge
-                                key={r}
-                                variant={r === "admin" ? "default" : r === "installer" ? "secondary" : "outline"}
-                              >
-                                {r}
-                              </Badge>
-                            ))
-                          )}
+                        <TableCell>
+                          <Select
+                            value={currentRole(u.roles)}
+                            onValueChange={(v) => roleMut.mutate({ user_id: u.id, role: v as ManagedRole })}
+                          >
+                            <SelectTrigger className="h-8 w-[130px]">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="admin">admin</SelectItem>
+                              <SelectItem value="installer">installer</SelectItem>
+                            </SelectContent>
+                          </Select>
                         </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
-                          {u.last_sign_in_at ? new Date(u.last_sign_in_at).toLocaleDateString("nl-BE") : "—"}
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Switch
+                              checked={u.active}
+                              disabled={toggleMut.isPending}
+                              onCheckedChange={(checked) =>
+                                toggleMut.mutate({ user_id: u.id, active: checked })
+                              }
+                              aria-label="Activeer of deactiveer installateur"
+                            />
+                            <StatusBadge active={u.active} />
+                          </div>
                         </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">{dateFmt(u.last_sign_in_at)}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground">{dateFmt(u.last_quote_at)}</TableCell>
                         <TableCell className="text-right tabular-nums">{u.generated}</TableCell>
                         <TableCell className="text-right tabular-nums">{u.sent}</TableCell>
-                        <TableCell className="text-right space-x-2">
+                        <TableCell className="text-right tabular-nums">{u.open}</TableCell>
+                        <TableCell className="text-right space-x-2 whitespace-nowrap">
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => {
-                              const current: AppRole = u.roles.includes("admin")
-                                ? "admin"
-                                : u.roles.includes("installer")
-                                  ? "installer"
-                                  : "customer";
-                              setRoleTarget({ id: u.id, email: u.email, current });
-                              setRoleOpen(true);
-                            }}
+                            disabled={resetMut.isPending}
+                            onClick={() => resetMut.mutate(u.id)}
                           >
-                            <Pencil className="mr-1 h-3 w-3" /> Rol wijzigen
+                            <KeyRound className="mr-1 h-3 w-3" /> Reset wachtwoord
                           </Button>
                           <Button
                             size="sm"
                             variant="destructive"
-                            disabled={removeMut.isPending}
-                            onClick={() => {
-                              if (confirm(`Installateur ${u.email} verwijderen?`)) {
-                                removeMut.mutate(u.id);
-                              }
-                            }}
+                            onClick={() => setConfirmDelete({ id: u.id, email: u.email })}
                           >
                             <Trash2 className="mr-1 h-3 w-3" /> Verwijderen
                           </Button>
@@ -225,7 +261,7 @@ function InstallersPage() {
                     ))}
                     {installers.length === 0 && (
                       <TableRow>
-                        <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                        <TableCell colSpan={10} className="text-center text-muted-foreground py-8">
                           Geen installateurs gevonden
                         </TableCell>
                       </TableRow>
@@ -237,22 +273,19 @@ function InstallersPage() {
               <div className="grid gap-3 md:hidden">
                 {installers.map((u) => (
                   <div key={u.id} className="rounded-lg border bg-card p-4 shadow-sm">
-                    <Link
-                      to="/beheer/installateurs/$id"
-                      params={{ id: u.id }}
-                      className="font-semibold truncate block hover:underline"
-                    >
-                      {u.email || "—"}
-                    </Link>
-                    <div className="text-sm text-muted-foreground">{u.name ?? u.company ?? "—"}</div>
-                    <div className="mt-2 flex flex-wrap gap-1">
-                      {u.roles.map((r) => (
-                        <Badge key={r} variant={r === "admin" ? "default" : r === "installer" ? "secondary" : "outline"}>
-                          {r}
-                        </Badge>
-                      ))}
+                    <div className="flex items-start justify-between gap-2">
+                      <Link
+                        to="/beheer/installateurs/$id"
+                        params={{ id: u.id }}
+                        className="font-semibold truncate block hover:underline"
+                      >
+                        {u.email || "—"}
+                      </Link>
+                      <StatusBadge active={u.active} />
                     </div>
-                    <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
+                    <div className="text-sm text-muted-foreground">{u.name ?? u.company ?? "—"}</div>
+
+                    <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
                       <div>
                         <div className="text-muted-foreground">Gegenereerd</div>
                         <div className="tabular-nums font-medium">{u.generated}</div>
@@ -261,35 +294,60 @@ function InstallersPage() {
                         <div className="text-muted-foreground">Verstuurd</div>
                         <div className="tabular-nums font-medium">{u.sent}</div>
                       </div>
+                      <div>
+                        <div className="text-muted-foreground">Open offertes</div>
+                        <div className="tabular-nums font-medium">{u.open}</div>
+                      </div>
+                      <div>
+                        <div className="text-muted-foreground">Laatste offerte</div>
+                        <div className="font-medium">{dateFmt(u.last_quote_at)}</div>
+                      </div>
                     </div>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="min-h-11"
-                        onClick={() => {
-                          const current: AppRole = u.roles.includes("admin")
-                            ? "admin"
-                            : u.roles.includes("installer")
-                              ? "installer"
-                              : "customer";
-                          setRoleTarget({ id: u.id, email: u.email, current });
-                          setRoleOpen(true);
-                        }}
-                      >
-                        <Pencil className="mr-1 h-3 w-3" /> Rol wijzigen
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="destructive"
-                        className="min-h-11"
-                        disabled={removeMut.isPending}
-                        onClick={() => {
-                          if (confirm(`Installateur ${u.email} verwijderen?`)) removeMut.mutate(u.id);
-                        }}
-                      >
-                        <Trash2 className="mr-1 h-3 w-3" /> Verwijderen
-                      </Button>
+
+                    <div className="mt-3 grid gap-2">
+                      <div className="grid gap-1.5">
+                        <Label className="text-xs text-muted-foreground">Rol</Label>
+                        <Select
+                          value={currentRole(u.roles)}
+                          onValueChange={(v) => roleMut.mutate({ user_id: u.id, role: v as ManagedRole })}
+                        >
+                          <SelectTrigger className="min-h-11">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="admin">admin</SelectItem>
+                            <SelectItem value="installer">installer</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="flex items-center justify-between rounded-md border px-3 py-2">
+                        <span className="text-sm">Actief</span>
+                        <Switch
+                          checked={u.active}
+                          disabled={toggleMut.isPending}
+                          onCheckedChange={(checked) => toggleMut.mutate({ user_id: u.id, active: checked })}
+                          aria-label="Activeer of deactiveer installateur"
+                        />
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="min-h-11"
+                          disabled={resetMut.isPending}
+                          onClick={() => resetMut.mutate(u.id)}
+                        >
+                          <KeyRound className="mr-1 h-3 w-3" /> Reset wachtwoord
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          className="min-h-11"
+                          onClick={() => setConfirmDelete({ id: u.id, email: u.email })}
+                        >
+                          <Trash2 className="mr-1 h-3 w-3" /> Verwijderen
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -308,24 +366,47 @@ function InstallersPage() {
           <DialogHeader>
             <DialogTitle>Installateur toevoegen</DialogTitle>
             <DialogDescription>
-              Voeg de rol "installer" toe aan een bestaande gebruiker via het e-mailadres.
+              Maakt een account aan met rol "installer" en status actief. Bestaat het e-mailadres al, dan
+              krijgt die gebruiker de rol installateur.
             </DialogDescription>
           </DialogHeader>
           <form
             onSubmit={(e) => {
               e.preventDefault();
-              addMut.mutate(addEmail.trim());
+              createMut.mutate({
+                email: form.email.trim(),
+                name: form.name.trim() || null,
+                company: form.company.trim() || null,
+              });
             }}
             className="grid gap-3"
           >
             <div className="grid gap-1.5">
-              <Label htmlFor="email">E-mailadres</Label>
+              <Label htmlFor="email">E-mailadres *</Label>
               <Input
                 id="email"
                 type="email"
-                value={addEmail}
-                onChange={(e) => setAddEmail(e.target.value)}
+                value={form.email}
+                onChange={(e) => setForm({ ...form, email: e.target.value })}
                 required
+                autoComplete="off"
+              />
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="name">Naam</Label>
+              <Input
+                id="name"
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                autoComplete="off"
+              />
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="company">Bedrijf</Label>
+              <Input
+                id="company"
+                value={form.company}
+                onChange={(e) => setForm({ ...form, company: e.target.value })}
                 autoComplete="off"
               />
             </div>
@@ -333,8 +414,8 @@ function InstallersPage() {
               <Button type="button" variant="ghost" onClick={() => setAddOpen(false)}>
                 Annuleren
               </Button>
-              <Button type="submit" disabled={addMut.isPending}>
-                {addMut.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              <Button type="submit" disabled={createMut.isPending}>
+                {createMut.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                 Toevoegen
               </Button>
             </DialogFooter>
@@ -342,73 +423,73 @@ function InstallersPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Change role modal */}
-      <Dialog open={roleOpen} onOpenChange={setRoleOpen}>
+      {/* Reset link modal */}
+      <Dialog open={resetLink !== null} onOpenChange={(o) => !o && setResetLink(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Rol wijzigen</DialogTitle>
+            <DialogTitle>Reset-link wachtwoord</DialogTitle>
             <DialogDescription>
-              {roleTarget?.email ? `Kies een nieuwe rol voor ${roleTarget.email}.` : ""}
+              Deel deze link met de installateur{resetLink?.email ? ` (${resetLink.email})` : ""}. Er wordt
+              geen e-mail verstuurd.
             </DialogDescription>
           </DialogHeader>
-          {roleTarget && (
-            <RoleForm
-              current={roleTarget.current}
-              onCancel={() => setRoleOpen(false)}
-              onSubmit={(newRole) =>
-                roleMut.mutate({ user_id: roleTarget.id, role: newRole })
-              }
-              busy={roleMut.isPending}
+          <div className="grid gap-2">
+            <textarea
+              readOnly
+              value={resetLink?.link ?? ""}
+              rows={4}
+              className="w-full rounded-md border bg-muted p-2 text-xs break-all"
             />
-          )}
+            <Button
+              type="button"
+              variant="outline"
+              onClick={async () => {
+                if (!resetLink) return;
+                try {
+                  await navigator.clipboard.writeText(resetLink.link);
+                  toast.success("Link gekopieerd");
+                } catch {
+                  toast.error("Kopiëren mislukt — selecteer de link handmatig");
+                }
+              }}
+            >
+              <Copy className="mr-1 h-4 w-4" /> Kopieer link
+            </Button>
+          </div>
+          <DialogFooter>
+            <Button type="button" onClick={() => setResetLink(null)}>
+              Sluiten
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete confirm modal */}
+      <Dialog open={confirmDelete !== null} onOpenChange={(o) => !o && setConfirmDelete(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Installateur verwijderen</DialogTitle>
+            <DialogDescription>
+              {confirmDelete?.email} wordt definitief verwijderd: account, rollen en profiel. Deze actie kan
+              niet ongedaan gemaakt worden.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button type="button" variant="ghost" onClick={() => setConfirmDelete(null)}>
+              Annuleren
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={deleteMut.isPending}
+              onClick={() => confirmDelete && deleteMut.mutate(confirmDelete.id)}
+            >
+              {deleteMut.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Definitief verwijderen
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </AppShell>
-  );
-}
-
-function RoleForm({
-  current,
-  onCancel,
-  onSubmit,
-  busy,
-}: {
-  current: AppRole;
-  onCancel: () => void;
-  onSubmit: (role: AppRole) => void;
-  busy: boolean;
-}) {
-  const [value, setValue] = useState<AppRole>(current);
-  return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault();
-        onSubmit(value);
-      }}
-      className="grid gap-3"
-    >
-      <div className="grid gap-1.5">
-        <Label>Rol</Label>
-        <Select value={value} onValueChange={(v) => setValue(v as AppRole)}>
-          <SelectTrigger>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="admin">admin</SelectItem>
-            <SelectItem value="installer">installer</SelectItem>
-            <SelectItem value="customer">customer</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-      <DialogFooter>
-        <Button type="button" variant="ghost" onClick={onCancel}>
-          Annuleren
-        </Button>
-        <Button type="submit" disabled={busy || value === current}>
-          {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-          Opslaan
-        </Button>
-      </DialogFooter>
-    </form>
   );
 }
