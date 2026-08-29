@@ -56,7 +56,7 @@ function Dashboard() {
 
   const [custOpen, setCustOpen] = useState(false);
   const [projOpen, setProjOpen] = useState(false);
-  const [custForm, setCustForm] = useState({ name: "", email: "", company: "", address: "", invite: true });
+  const [custForm, setCustForm] = useState({ name: "", email: "", company: "", address: "" });
   const [projForm, setProjForm] = useState({ customer_id: "", title: "", description: "" });
 
   const createCustMut = useMutation({
@@ -67,13 +67,13 @@ function Dashboard() {
           email: custForm.email,
           company: custForm.company || null,
           address: custForm.address || null,
-          invite: custForm.invite,
+          invite: false,
         },
       }),
     onSuccess: () => {
       toast.success("Klant aangemaakt");
       setCustOpen(false);
-      setCustForm({ name: "", email: "", company: "", address: "", invite: true });
+      setCustForm({ name: "", email: "", company: "", address: "" });
       qc.invalidateQueries({ queryKey: ["customers"] });
     },
     onError: (e: Error) => toast.error(e.message),
@@ -128,10 +128,6 @@ function Dashboard() {
                   <div className="grid gap-1.5"><Label>E-mail</Label><Input type="email" value={custForm.email} onChange={(e) => setCustForm({ ...custForm, email: e.target.value })} /></div>
                   <div className="grid gap-1.5"><Label>Bedrijf</Label><Input value={custForm.company} onChange={(e) => setCustForm({ ...custForm, company: e.target.value })} /></div>
                   <div className="grid gap-1.5"><Label>Adres</Label><Input value={custForm.address} onChange={(e) => setCustForm({ ...custForm, address: e.target.value })} /></div>
-                  <label className="flex items-center gap-2 text-sm">
-                    <input type="checkbox" checked={custForm.invite} onChange={(e) => setCustForm({ ...custForm, invite: e.target.checked })} />
-                    Nodig klant uit voor portaal (magic link)
-                  </label>
                 </div>
                 <DialogFooter className="flex-col-reverse gap-2 sm:flex-row">
                   <Button variant="secondary" onClick={() => setCustOpen(false)} className="min-h-11 w-full sm:w-auto">Annuleren</Button>
