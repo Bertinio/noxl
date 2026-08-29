@@ -12,7 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Toaster } from "@/components/ui/sonner";
 import { getInstallerSettings, updateInstallerSettings } from "@/lib/noxl.functions";
-import { supabase } from "@/integrations/supabase/client";
+import { changePassword } from "@/lib/auth-client";
 import { UnitsManager } from "@/components/noxl/UnitsManager";
 
 export const Route = createFileRoute("/_authenticated/instellingen")({
@@ -47,11 +47,8 @@ function SettingsPage() {
     }
     setPwBusy(true);
     try {
-      const { error } = await supabase.auth.updateUser({
-        password: pw.next,
-        current_password: pw.current,
-      });
-      if (error) throw error;
+      const res = await changePassword(pw.current, pw.next);
+      if (!res.ok) throw new Error(res.message);
       toast.success("Wachtwoord gewijzigd");
       setPw({ current: "", next: "", confirm: "" });
     } catch (err) {
@@ -102,7 +99,7 @@ function SettingsPage() {
   }
 
   return (
-    <AppShell role="admin" title="Instellingen">
+    <AppShell title="Instellingen">
       <Toaster position="top-right" richColors />
       <div className="max-w-2xl">
         <Card>

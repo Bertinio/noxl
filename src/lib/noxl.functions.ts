@@ -35,9 +35,22 @@ export const getMyRole = createServerFn({ method: "GET" })
     const roles = (data ?? []).map((r) => r.role);
     if (roles.includes("admin")) return { role: "admin" as const };
     if (roles.includes("installer")) return { role: "installer" as const };
-    if (roles.includes("customer")) return { role: "customer" as const };
-    // No role yet (edge case for pre-trigger accounts): treat as installer.
-    return { role: "installer" as const };
+    // Geen rol toegekend: geen toegang (RLS blokkeert alle data).
+    return { role: null };
+  });
+
+// Actief-status van het eigen account. Login wordt geweigerd wanneer een
+// beheerder het account heeft gedeactiveerd (installer_settings.active = false).
+export const getMyAccountStatus = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase, userId } = context;
+    const { data } = await supabase
+      .from("installer_settings")
+      .select("active")
+      .eq("user_id", userId)
+      .maybeSingle();
+    return { active: data?.active ?? true };
   });
 
 // ---------- installer settings ----------
@@ -128,34 +141,12 @@ export const createCustomer = createServerFn({ method: "POST" })
       email: z.string().trim().email().max(255),
       company: z.string().trim().max(200).optional().nullable(),
       address: z.string().trim().max(500).optional().nullable(),
-      invite: z.boolean().default(false),
     }).parse(i),
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-    let authUserId: string | null = null;
-
-    if (data.invite) {
-      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-      const { data: existing } = await supabaseAdmin.auth.admin.listUsers();
-      const found = existing?.users?.find(
-        (u) => u.email?.toLowerCase() === data.email.toLowerCase(),
-      );
-      if (found) {
-        authUserId = found.id;
-      } else {
-        const { data: invited, error: invErr } =
-          await supabaseAdmin.auth.admin.inviteUserByEmail(data.email);
-        if (invErr) console.error("[invite]", invErr.message);
-        authUserId = invited?.user?.id ?? null;
-      }
-      if (authUserId) {
-        await supabaseAdmin
-          .from("user_roles")
-          .upsert({ user_id: authUserId, role: "customer" }, { onConflict: "user_id,role" });
-      }
-    }
-
+    // Klanten zijn puur administratieve records van de installateur: er wordt
+    // geen auth-account, uitnodiging of klantrol aangemaakt.
     const { data: row, error } = await supabase
       .from("customers")
       .insert({
@@ -164,7 +155,6 @@ export const createCustomer = createServerFn({ method: "POST" })
         email: data.email,
         company: data.company ?? null,
         address: data.address ?? null,
-        auth_user_id: authUserId,
       })
       .select("id")
       .single();
@@ -684,37 +674,6 @@ export const resendQuoteEmail = createServerFn({ method: "POST" })
     return result;
   });
 
-// ---------- customer portal ----------
-export const myPortalData = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
-    const { supabase, userId } = context;
-    const { data: customer } = await supabase
-      .from("customers")
-      .select("id, name, email, company, address")
-      .eq("auth_user_id", userId)
-      .maybeSingle();
-    if (!customer) return { customer: null, projects: [], quotes: [] };
-
-    const { data: projects } = await supabase
-      .from("projects")
-      .select("id, title, status, total_price, created_at")
-      .eq("customer_id", customer.id)
-      .order("created_at", { ascending: false });
-
-    const projectIds = (projects ?? []).map((p) => p.id);
-    let quotes: Array<{ id: string; quote_number: string; total_price: number; created_at: string; project_id: string }> = [];
-    if (projectIds.length > 0) {
-      const { data: q } = await supabase
-        .from("project_quotes")
-        .select("id, quote_number, total_price, created_at, project_id")
-        .in("project_id", projectIds)
-        .order("created_at", { ascending: false });
-      quotes = q ?? [];
-    }
-    return { customer, projects: projects ?? [], quotes };
-  });
-
 // ---------- admin panel ----------
 export const listAdminUsers = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -748,7 +707,7 @@ export const addUserRole = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) =>
     z.object({
       user_id: z.string().uuid(),
-      role: z.enum(["admin", "installer", "customer"]),
+      role: z.enum(["admin", "installer"]),
     }).parse(i),
   )
   .handler(async ({ data, context }) => {
@@ -769,7 +728,7 @@ export const removeUserRole = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) =>
     z.object({
       user_id: z.string().uuid(),
-      role: z.enum(["admin", "installer", "customer"]),
+      role: z.enum(["admin", "installer"]),
     }).parse(i),
   )
   .handler(async ({ data, context }) => {
@@ -792,7 +751,7 @@ export const removeUserRole = createServerFn({ method: "POST" })
   });
 
 // ---------- installer management ----------
-const roleSchema = z.enum(["admin", "installer", "customer"]);
+const roleSchema = z.enum(["admin", "installer"]);
 
 async function countRoleHolders(_sb: SB, role: AppRole): Promise<number> {
   // RLS on user_roles restricts SELECT to the caller's own rows, which would
@@ -1018,8 +977,7 @@ export const removeInstaller = createServerFn({ method: "POST" })
     return { ok: true as const };
   });
 
-// Overwrite: set the user to exactly one role among admin/installer/customer.
-// Overwrite: set the user to exactly one role among admin/installer/customer.
+// Overwrite: zet de gebruiker op exact één rol: admin of installer.
 // Only guard: never remove the last admin (app would be locked out).
 export const updateUserRole = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

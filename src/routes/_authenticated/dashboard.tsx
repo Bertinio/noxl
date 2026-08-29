@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute,  useNavigate } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
@@ -67,7 +67,6 @@ function Dashboard() {
           email: custForm.email,
           company: custForm.company || null,
           address: custForm.address || null,
-          invite: false,
         },
       }),
     onSuccess: () => {
@@ -99,19 +98,15 @@ function Dashboard() {
   });
 
   if (role.isLoading) return <div className="flex min-h-screen items-center justify-center"><Loader2 className="h-6 w-6 animate-spin" /></div>;
-  if (role.data?.role === "customer") {
+  if (role.data && role.data.role === null) {
     return (
-      <div className="flex min-h-screen items-center justify-center p-6 text-center">
-        <div>
-          <p className="mb-4">Geen toegang tot het beheerdashboard.</p>
-          <Link to="/portal" className="text-primary underline">Ga naar het klantportaal</Link>
-        </div>
+      <div className="flex min-h-screen items-center justify-center p-6 text-center text-muted-foreground">
+        Dit account heeft geen installateursrol. Neem contact op met je beheerder.
       </div>
     );
   }
-
   return (
-    <AppShell role="admin" title="Dashboard">
+    <AppShell title="Dashboard">
       <Toaster position="top-right" richColors />
       <div className="grid gap-6 md:grid-cols-2">
         <Card>

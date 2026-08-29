@@ -162,7 +162,7 @@ function InstallersPage() {
     );
 
   return (
-    <AppShell role="admin" title="Installateurs">
+    <AppShell title="Installateurs">
       <Toaster position="top-right" richColors />
       <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-2">

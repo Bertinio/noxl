@@ -1,6 +1,6 @@
 import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
-import { LayoutDashboard, Users, FolderKanban, LogOut, FileText, Home, Package, ShieldCheck, Settings, Ruler } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { LayoutDashboard, Users, LogOut, FileText, Home, Package, ShieldCheck, Settings, Ruler } from "lucide-react";
+import { signOutEverywhere } from "@/lib/auth-client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { getMyRole } from "@/lib/noxl.functions";
@@ -37,11 +37,7 @@ const adminExtraNav: NavItem[] = [
   { title: "Beheer", url: "/admin", icon: ShieldCheck },
 ];
 
-const portalNav: NavItem[] = [
-  { title: "Mijn projecten", url: "/portal", icon: FolderKanban },
-];
-
-export function AppShell({ role, children, title }: { role: "admin" | "customer"; children: ReactNode; title?: string }) {
+export function AppShell({ children, title }: { children: ReactNode; title?: string }) {
   const currentPath = useRouterState({ select: (r) => r.location.pathname });
   const navigate = useNavigate();
   const qc = useQueryClient();
@@ -49,15 +45,12 @@ export function AppShell({ role, children, title }: { role: "admin" | "customer"
   const roleQuery = useQuery({
     queryKey: ["my-role"],
     queryFn: () => fetchRole(),
-    enabled: role === "admin",
   });
   const isAdmin = roleQuery.data?.role === "admin";
-  const nav = role === "admin" ? [...installerNav, ...(isAdmin ? adminExtraNav : [])] : portalNav;
+  const nav = [...installerNav, ...(isAdmin ? adminExtraNav : [])];
 
   async function handleSignOut() {
-    await qc.cancelQueries();
-    qc.clear();
-    await supabase.auth.signOut();
+    await signOutEverywhere(qc);
     navigate({ to: "/auth", replace: true });
   }
 
@@ -73,7 +66,7 @@ export function AppShell({ role, children, title }: { role: "admin" | "customer"
           </SidebarHeader>
           <SidebarContent>
             <SidebarGroup>
-              <SidebarGroupLabel>{role === "admin" ? "Beheer" : "Portaal"}</SidebarGroupLabel>
+              <SidebarGroupLabel>{isAdmin ? "Beheer" : "Installateur"}</SidebarGroupLabel>
               <SidebarGroupContent>
                 <SidebarMenu>
                   {nav.map((item) => (
@@ -100,7 +93,7 @@ export function AppShell({ role, children, title }: { role: "admin" | "customer"
           <header className="h-14 flex items-center gap-3 border-b bg-background px-4 sticky top-0 z-30">
             <SidebarTrigger className="min-h-11 min-w-11" />
             {title ? <h1 className="text-lg sm:text-base font-semibold truncate">{title}</h1> : null}
-            {role === "admin" && isAdmin ? (
+            {isAdmin ? (
               <Badge variant="secondary" className="ml-auto gap-1">
                 <ShieldCheck className="h-3 w-3" /> Admin
               </Badge>
