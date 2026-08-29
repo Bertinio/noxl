@@ -82,7 +82,7 @@ export function ProductImportExport() {
       const sheet = wb.Sheets[wb.SheetNames[0]];
       const json = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: "" });
       setPreviewSource("xlsx");
-      setPreview(normalizeRowsX(json));
+      setPreview(normalizeRows(json, allowedUnits.length ? allowedUnits : ["stuk"]));
     } catch (e) {
       toast.error("Kon XLSX niet lezen: " + (e as Error).message);
     }
@@ -94,7 +94,7 @@ export function ProductImportExport() {
       skipEmptyLines: true,
       complete: (res) => {
         setPreviewSource("csv");
-        setPreview(normalizeRowsX(res.data));
+        setPreview(normalizeRows(res.data, allowedUnits.length ? allowedUnits : ["stuk"]));
       },
       error: (err) => toast.error("Kon CSV niet lezen: " + err.message),
     });
