@@ -98,6 +98,13 @@ function Dashboard() {
   });
 
   if (role.isLoading) return <div className="flex min-h-screen items-center justify-center"><Loader2 className="h-6 w-6 animate-spin" /></div>;
+  if (role.data && role.data.role === null) {
+    return (
+      <div className="flex min-h-screen items-center justify-center p-6 text-center text-muted-foreground">
+        Dit account heeft geen installateursrol. Neem contact op met je beheerder.
+      </div>
+    );
+  }
   return (
     <AppShell title="Dashboard">
       <Toaster position="top-right" richColors />

@@ -35,8 +35,8 @@ export const getMyRole = createServerFn({ method: "GET" })
     const roles = (data ?? []).map((r) => r.role);
     if (roles.includes("admin")) return { role: "admin" as const };
     if (roles.includes("installer")) return { role: "installer" as const };
-    // No role yet (edge case for pre-trigger accounts): treat as installer.
-    return { role: "installer" as const };
+    // Geen rol toegekend: geen toegang (RLS blokkeert alle data).
+    return { role: null };
   });
 
 // Actief-status van het eigen account. Login wordt geweigerd wanneer een
