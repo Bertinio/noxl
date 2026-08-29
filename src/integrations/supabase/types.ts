@@ -115,6 +115,7 @@ export type Database = {
       }
       installer_settings: {
         Row: {
+          active: boolean
           address: string | null
           company: string | null
           created_at: string
@@ -127,6 +128,7 @@ export type Database = {
           vat_rate: number
         }
         Insert: {
+          active?: boolean
           address?: string | null
           company?: string | null
           created_at?: string
@@ -139,6 +141,7 @@ export type Database = {
           vat_rate?: number
         }
         Update: {
+          active?: boolean
           address?: string | null
           company?: string | null
           created_at?: string
