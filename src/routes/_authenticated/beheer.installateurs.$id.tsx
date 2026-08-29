@@ -43,7 +43,7 @@ export const Route = createFileRoute("/_authenticated/beheer/installateurs/$id")
   component: InstallerDetailPage,
 });
 
-type AppRole = "admin" | "installer" | "customer";
+type AppRole = "admin" | "installer";
 const currency = new Intl.NumberFormat("nl-BE", { style: "currency", currency: "EUR" });
 
 function InstallerDetailPage() {
@@ -151,7 +151,7 @@ function InstallerDetailPage() {
                 {d.roles.map((r) => (
                   <Badge
                     key={r}
-                    variant={r === "admin" ? "default" : r === "installer" ? "secondary" : "outline"}
+                    variant={r === "admin" ? "default" : "secondary"}
                   >
                     {r}
                   </Badge>
@@ -163,11 +163,7 @@ function InstallerDetailPage() {
                 size="sm"
                 variant="outline"
                 onClick={() => {
-                  const current: AppRole = d.roles.includes("admin")
-                    ? "admin"
-                    : d.roles.includes("installer")
-                      ? "installer"
-                      : "customer";
+                  const current: AppRole = d.roles.includes("admin") ? "admin" : "installer";
                   setNewRole(current);
                   setRoleOpen(true);
                 }}
@@ -241,7 +237,6 @@ function InstallerDetailPage() {
                 <SelectContent>
                   <SelectItem value="admin">admin</SelectItem>
                   <SelectItem value="installer">installer</SelectItem>
-                  <SelectItem value="customer">customer</SelectItem>
                 </SelectContent>
               </Select>
             </div>

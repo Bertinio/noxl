@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Loader2, Ruler } from "lucide-react";
 
-import { supabase } from "@/integrations/supabase/client";
+import { getSession, onAuthEvent, setNewPassword } from "@/lib/auth-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -38,14 +38,14 @@ function ResetPasswordPage() {
       setInvalid(true);
       return;
     }
-    const { data: sub } = supabase.auth.onAuthStateChange((event) => {
+    const unsubscribe = onAuthEvent((event) => {
       if (event === "PASSWORD_RECOVERY") setReady(true);
     });
     // Fallback: sessie kan al gehydrateerd zijn vóór de listener mount.
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session) setReady(true);
+    getSession().then((session) => {
+      if (session) setReady(true);
     });
-    return () => sub.subscription.unsubscribe();
+    return unsubscribe;
   }, []);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -56,8 +56,8 @@ function ResetPasswordPage() {
     }
     setBusy(true);
     try {
-      const { error } = await supabase.auth.updateUser({ password });
-      if (error) throw error;
+      const res = await setNewPassword(password);
+      if (!res.ok) throw new Error(res.message);
       toast.success("Wachtwoord gewijzigd", {
         description: "Je bent nu ingelogd met je nieuwe wachtwoord.",
       });

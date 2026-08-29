@@ -99,17 +99,6 @@ function Dashboard() {
   });
 
   if (role.isLoading) return <div className="flex min-h-screen items-center justify-center"><Loader2 className="h-6 w-6 animate-spin" /></div>;
-  if (role.data?.role === "customer") {
-    return (
-      <div className="flex min-h-screen items-center justify-center p-6 text-center">
-        <div>
-          <p className="mb-4">Geen toegang tot het beheerdashboard.</p>
-          <Link to="/portal" className="text-primary underline">Ga naar het klantportaal</Link>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <AppShell title="Dashboard">
       <Toaster position="top-right" richColors />

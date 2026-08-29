@@ -27,19 +27,16 @@ export const Route = createFileRoute("/_authenticated/admin")({
   component: AdminPanel,
 });
 
-type AppRole = "admin" | "installer" | "customer";
-const ALL_ROLES: AppRole[] = ["admin", "installer", "customer"];
+type AppRole = "admin" | "installer";
+const ALL_ROLES: AppRole[] = ["admin", "installer"];
 
-function roleBadgeVariant(role: AppRole): "default" | "secondary" | "outline" {
-  if (role === "admin") return "default";
-  if (role === "installer") return "secondary";
-  return "outline";
+function roleBadgeVariant(role: AppRole): "default" | "secondary" {
+  return role === "admin" ? "default" : "secondary";
 }
 
 function primaryRole(roles: string[]): AppRole | null {
   if (roles.includes("admin")) return "admin";
   if (roles.includes("installer")) return "installer";
-  if (roles.includes("customer")) return "customer";
   return null;
 }
 
@@ -82,7 +79,7 @@ function AdminPanel() {
       <div className="flex min-h-screen items-center justify-center p-6 text-center">
         <div>
           <p className="mb-4">Alleen beheerders hebben toegang tot dit paneel.</p>
-          <Link to="/portal" className="text-primary underline">Ga naar het klantportaal</Link>
+          <Link to="/dashboard" className="text-primary underline">Terug naar je dashboard</Link>
         </div>
       </div>
     );
@@ -126,7 +123,7 @@ function AdminPanel() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <ShieldCheck className="h-5 w-5" /> Gebruikers en rollen
+            <ShieldCheck className="h-5 w-5" /> Beheerders en installateurs
           </CardTitle>
         </CardHeader>
         <CardContent>
