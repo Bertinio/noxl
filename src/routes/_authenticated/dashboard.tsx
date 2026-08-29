@@ -128,10 +128,6 @@ function Dashboard() {
                   <div className="grid gap-1.5"><Label>E-mail</Label><Input type="email" value={custForm.email} onChange={(e) => setCustForm({ ...custForm, email: e.target.value })} /></div>
                   <div className="grid gap-1.5"><Label>Bedrijf</Label><Input value={custForm.company} onChange={(e) => setCustForm({ ...custForm, company: e.target.value })} /></div>
                   <div className="grid gap-1.5"><Label>Adres</Label><Input value={custForm.address} onChange={(e) => setCustForm({ ...custForm, address: e.target.value })} /></div>
-                  <label className="flex items-center gap-2 text-sm">
-                    <input type="checkbox" checked={custForm.invite} onChange={(e) => setCustForm({ ...custForm, invite: e.target.checked })} />
-                    Nodig klant uit voor portaal (magic link)
-                  </label>
                 </div>
                 <DialogFooter className="flex-col-reverse gap-2 sm:flex-row">
                   <Button variant="secondary" onClick={() => setCustOpen(false)} className="min-h-11 w-full sm:w-auto">Annuleren</Button>
