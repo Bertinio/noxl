@@ -128,7 +128,7 @@ export const createCustomer = createServerFn({ method: "POST" })
       email: z.string().trim().email().max(255),
       company: z.string().trim().max(200).optional().nullable(),
       address: z.string().trim().max(500).optional().nullable(),
-      invite: z.boolean().default(true),
+      invite: z.boolean().default(false),
     }).parse(i),
   )
   .handler(async ({ data, context }) => {
