@@ -60,7 +60,7 @@ function ProjectDetail() {
   const customer = data.customer;
 
   return (
-    <AppShell role="admin" title={p.title}>
+    <AppShell title={p.title}>
       <Toaster position="top-right" richColors />
       <div className="mb-4 flex items-center gap-2">
         <Button variant="ghost" size="sm" asChild><Link to="/dashboard"><ArrowLeft className="mr-1 h-4 w-4" /> Terug</Link></Button>

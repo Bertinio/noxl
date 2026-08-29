@@ -44,7 +44,7 @@ function QuotesList() {
   if (!data) return null;
 
   return (
-    <AppShell role="admin" title="Offertes">
+    <AppShell title="Offertes">
       <Toaster position="top-right" richColors />
       <div className="mb-4"><Button variant="ghost" size="sm" asChild><Link to="/projects/$id" params={{ id }}><ArrowLeft className="mr-1 h-4 w-4" /> Terug</Link></Button></div>
       <Card>

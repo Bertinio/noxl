@@ -94,7 +94,7 @@ function ProductsPage() {
   }
 
   return (
-    <AppShell role="admin" title="Producten">
+    <AppShell title="Producten">
       <Toaster position="top-right" richColors />
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-muted-foreground">Beheer je productcatalogus. Gebruikt door de configurator.</p>

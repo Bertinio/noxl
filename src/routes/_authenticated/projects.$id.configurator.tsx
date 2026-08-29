@@ -83,7 +83,7 @@ function Configurator() {
   }
 
   return (
-    <AppShell role="admin" title="Configurator">
+    <AppShell title="Configurator">
       <Toaster position="top-right" richColors />
       <div className="mb-4"><Button variant="ghost" size="sm" asChild><Link to="/projects/$id" params={{ id }}><ArrowLeft className="mr-1 h-4 w-4" /> Terug naar project</Link></Button></div>
       <Card>

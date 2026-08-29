@@ -121,7 +121,7 @@ function AdminPanel() {
   };
 
   return (
-    <AppShell role="admin" title="Beheer">
+    <AppShell title="Beheer">
       <Toaster position="top-right" richColors />
       <Card>
         <CardHeader>

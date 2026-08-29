@@ -35,7 +35,7 @@ function UnitsAdminPage() {
 
   if (role.data?.role !== "admin") {
     return (
-      <AppShell role="admin" title="Eenheden">
+      <AppShell title="Eenheden">
         <p className="text-sm text-muted-foreground">
           Geen toegang. Eenheden beheren is voorbehouden aan beheerders.{" "}
           <Link to="/instellingen" className="underline">
@@ -48,7 +48,7 @@ function UnitsAdminPage() {
   }
 
   return (
-    <AppShell role="admin" title="Eenheden">
+    <AppShell title="Eenheden">
       <Toaster position="top-right" richColors />
       <p className="mb-4 text-sm text-muted-foreground">
         Globale eenheden zijn beschikbaar voor alle installateurs. Het rekentype bepaalt welke velden de

@@ -110,7 +110,7 @@ function InstallerDetailPage() {
   }
   if (!detail.data) {
     return (
-      <AppShell role="admin" title="Installateur">
+      <AppShell title="Installateur">
         <p className="text-muted-foreground">Niet gevonden.</p>
       </AppShell>
     );
@@ -119,7 +119,7 @@ function InstallerDetailPage() {
   const d = detail.data;
 
   return (
-    <AppShell role="admin" title={d.user.email || "Installateur"}>
+    <AppShell title={d.user.email || "Installateur"}>
       <Toaster position="top-right" richColors />
       <div className="mb-4">
         <Button asChild variant="ghost" size="sm">

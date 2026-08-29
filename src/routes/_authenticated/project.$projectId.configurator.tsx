@@ -151,7 +151,7 @@ export default function Configurator() {
   const products = productsQ.data ?? [];
 
   return (
-    <AppShell role="admin" title="Configurator">
+    <AppShell title="Configurator">
       <Toaster position="top-right" richColors />
       <div className="mb-4 flex flex-col gap-3 sm:mb-6 sm:flex-row sm:items-center sm:justify-between">
         <Button variant="outline" asChild className="min-h-12 w-full justify-start sm:w-auto">

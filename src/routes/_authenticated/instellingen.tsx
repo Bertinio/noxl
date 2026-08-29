@@ -102,7 +102,7 @@ function SettingsPage() {
   }
 
   return (
-    <AppShell role="admin" title="Instellingen">
+    <AppShell title="Instellingen">
       <Toaster position="top-right" richColors />
       <div className="max-w-2xl">
         <Card>

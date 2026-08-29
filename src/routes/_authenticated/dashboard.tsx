@@ -111,7 +111,7 @@ function Dashboard() {
   }
 
   return (
-    <AppShell role="admin" title="Dashboard">
+    <AppShell title="Dashboard">
       <Toaster position="top-right" richColors />
       <div className="grid gap-6 md:grid-cols-2">
         <Card>
