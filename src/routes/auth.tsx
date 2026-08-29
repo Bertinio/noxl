@@ -232,7 +232,18 @@ function AuthPage() {
                 "Account aanmaken"
               )}
             </Button>
+            {mode === "signin" && (
+              <button
+                type="button"
+                onClick={() => setMode("forgot")}
+                className="justify-self-center text-sm text-muted-foreground underline underline-offset-2 hover:text-foreground"
+              >
+                Wachtwoord vergeten?
+              </button>
+            )}
           </form>
+            </>
+          )}
         </div>
       </div>
     </div>
