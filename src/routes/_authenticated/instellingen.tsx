@@ -12,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Toaster } from "@/components/ui/sonner";
 import { getInstallerSettings, updateInstallerSettings } from "@/lib/noxl.functions";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/_authenticated/instellingen")({
   head: () => ({
