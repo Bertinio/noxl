@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute,  useNavigate } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
@@ -67,7 +67,6 @@ function Dashboard() {
           email: custForm.email,
           company: custForm.company || null,
           address: custForm.address || null,
-          invite: false,
         },
       }),
     onSuccess: () => {
