@@ -8,6 +8,13 @@
       "when": 1787995794839,
       "tag": "0000_add_active_to_installer_settings",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1787997294654,
+      "tag": "0001_create_units",
+      "breakpoints": true
     }
   ]
 }

@@ -13,6 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Toaster } from "@/components/ui/sonner";
 import { getInstallerSettings, updateInstallerSettings } from "@/lib/noxl.functions";
 import { supabase } from "@/integrations/supabase/client";
+import { UnitsManager } from "@/components/noxl/UnitsManager";
 
 export const Route = createFileRoute("/_authenticated/instellingen")({
   head: () => ({
@@ -251,6 +252,8 @@ function SettingsPage() {
             </form>
           </CardContent>
         </Card>
+
+        <UnitsManager scope="own" />
       </div>
     </AppShell>
   );

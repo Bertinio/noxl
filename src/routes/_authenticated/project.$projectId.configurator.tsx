@@ -11,7 +11,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Toaster } from "@/components/ui/sonner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { getProject, saveConfigurations, listProducts } from "@/lib/noxl.functions";
+import { getProject, saveConfigurations, listProducts, listUnits } from "@/lib/noxl.functions";
+import { resolveUnit, unitSuffix, computeLineTotal, metricsLabel, type UnitDef } from "@/lib/units";
 
 export const Route = createFileRoute("/_authenticated/project/$projectId/configurator")({
   head: () => ({ meta: [{ title: "Configurator — NoXL" }] }),
@@ -21,9 +22,6 @@ export const Route = createFileRoute("/_authenticated/project/$projectId/configu
 const currency = new Intl.NumberFormat("nl-BE", { style: "currency", currency: "EUR" });
 const num = new Intl.NumberFormat("nl-BE", { maximumFractionDigits: 3 });
 
-type Unit = "stuk" | "lengte" | "oppervlakte";
-const unitSuffix: Record<Unit, string> = { stuk: "/ stuk", lengte: "/ meter", oppervlakte: "/ m²" };
-
 type Row = {
   product_id: string;
   option_name: string;
@@ -32,32 +30,13 @@ type Row = {
   height_mm: number; // only for oppervlakte: hoogte in mm
   quantity: number;
   unit_price: number;
-  unit: Unit;
+  unit: string;
 };
 
 function emptyRow(): Row {
   return { product_id: "", option_name: "", option_value: "", width_mm: 0, height_mm: 0, quantity: 1, unit_price: 0, unit: "stuk" };
 }
 
-function lineTotal(r: Row) {
-  const qty = r.quantity || 0;
-  if (r.unit === "oppervlakte") {
-    return ((r.width_mm * r.height_mm) / 1_000_000) * r.unit_price * qty;
-  }
-  if (r.unit === "lengte") {
-    return (r.width_mm / 1000) * r.unit_price * qty;
-  }
-  return qty * r.unit_price;
-}
-
-function metrics(r: Row): string {
-  if (r.unit === "oppervlakte") {
-    const a = (r.width_mm * r.height_mm) / 1_000_000;
-    return `${num.format(a)} m²`;
-  }
-  if (r.unit === "lengte") return `${num.format(r.width_mm / 1000)} m`;
-  return `${r.quantity} stuk${r.quantity === 1 ? "" : "s"}`;
-}
 
 export default function Configurator() {
   const { projectId } = Route.useParams();
@@ -71,6 +50,12 @@ export default function Configurator() {
     queryFn: () => fetchProject({ data: { id: projectId } }),
   });
   const productsQ = useQuery({ queryKey: ["products"], queryFn: () => fetchProducts() });
+  const fetchUnits = useServerFn(listUnits);
+  const unitsQ = useQuery({ queryKey: ["units"], queryFn: () => fetchUnits() });
+  const units: UnitDef[] = (unitsQ.data ?? []).map((u) => ({ ...u, basis: u.basis as UnitDef["basis"] }));
+  const unitOf = (code: string | null | undefined) => resolveUnit(units, code);
+  const lineTotal = (r: Row) => computeLineTotal(unitOf(r.unit).basis, r);
+  const metrics = (r: Row) => metricsLabel(unitOf(r.unit), r);
 
   const [rows, setRows] = useState<Row[]>([]);
   const [newRow, setNewRow] = useState<Row>(emptyRow());
@@ -81,7 +66,6 @@ export default function Configurator() {
         projectQ.data.configurations
           .filter((c) => c.product_id)
           .map((c) => {
-            const u = (c.unit ?? "stuk") as Unit;
             return {
               product_id: c.product_id as string,
               option_name: c.option_name,
@@ -90,7 +74,7 @@ export default function Configurator() {
               height_mm: Number(c.height_mm) || 0,
               quantity: c.quantity,
               unit_price: Number(c.unit_price),
-              unit: (["stuk", "lengte", "oppervlakte"].includes(u) ? u : "stuk") as Unit,
+              unit: c.unit ?? "stuk",
             };
           }),
       );
@@ -127,15 +111,13 @@ export default function Configurator() {
   function pickProduct(productId: string) {
     const p = (productsQ.data ?? []).find((x) => x.id === productId);
     if (!p) return;
-    const u = ((p.unit ?? "stuk") as Unit);
-    const unit = (["stuk", "lengte", "oppervlakte"].includes(u) ? u : "stuk") as Unit;
     setNewRow({
       ...newRow,
       product_id: p.id,
       option_name: p.name,
       option_value: p.description ?? "",
       unit_price: Number(p.unit_price) || 0,
-      unit,
+      unit: p.unit ?? "stuk",
       width_mm: 0,
       height_mm: 0,
       quantity: 1,
@@ -144,10 +126,11 @@ export default function Configurator() {
 
   function addRule() {
     if (!newRow.product_id) { toast.error("Kies een product"); return; }
-    if (newRow.unit === "oppervlakte" && (newRow.width_mm <= 0 || newRow.height_mm <= 0)) {
+    const newBasis = unitOf(newRow.unit).basis;
+    if (newBasis === "oppervlakte" && (newRow.width_mm <= 0 || newRow.height_mm <= 0)) {
       toast.error("Vul breedte en hoogte in"); return;
     }
-    if (newRow.unit === "lengte" && newRow.width_mm <= 0) {
+    if (newBasis === "lengte" && newRow.width_mm <= 0) {
       toast.error("Vul de lengte in"); return;
     }
     if (newRow.quantity <= 0) { toast.error("Aantal moet groter zijn dan 0"); return; }
@@ -208,7 +191,7 @@ export default function Configurator() {
                       <TableCell className="font-medium">{r.option_name}</TableCell>
                       <TableCell>{metrics(r)}</TableCell>
                       <TableCell className="text-right">{r.quantity}</TableCell>
-                      <TableCell className="text-right">{currency.format(r.unit_price)} {unitSuffix[r.unit]}</TableCell>
+                      <TableCell className="text-right">{currency.format(r.unit_price)} {unitSuffix(unitOf(r.unit))}</TableCell>
                       <TableCell className="text-right">{currency.format(lineTotal(r))}</TableCell>
                       <TableCell className="text-right">
                         <Button variant="ghost" size="icon" onClick={() => removeRule(i)}><Trash2 className="h-4 w-4" /></Button>
@@ -242,7 +225,7 @@ export default function Configurator() {
                     </div>
                     <div>
                       <dt className="text-xs text-muted-foreground">Prijs</dt>
-                      <dd className="font-medium">{currency.format(r.unit_price)} {unitSuffix[r.unit]}</dd>
+                      <dd className="font-medium">{currency.format(r.unit_price)} {unitSuffix(unitOf(r.unit))}</dd>
                     </div>
                     <div>
                       <dt className="text-xs text-muted-foreground">Totaal</dt>
@@ -273,11 +256,9 @@ export default function Configurator() {
                     <SelectTrigger className="min-h-11"><SelectValue placeholder="Kies een product" /></SelectTrigger>
                     <SelectContent>
                       {products.map((p) => {
-                        const u = ((p.unit ?? "stuk") as Unit);
-                        const uk = (["stuk", "lengte", "oppervlakte"].includes(u) ? u : "stuk") as Unit;
                         return (
                           <SelectItem key={p.id} value={p.id}>
-                            {p.name} — {currency.format(Number(p.unit_price) || 0)} {unitSuffix[uk]}
+                            {p.name} — {currency.format(Number(p.unit_price) || 0)} {unitSuffix(unitOf(p.unit))}
                           </SelectItem>
                         );
                       })}
@@ -291,7 +272,7 @@ export default function Configurator() {
                 </div>
 
                 <div className="grid gap-3 sm:grid-cols-4 sm:items-end">
-                  {newRow.unit === "oppervlakte" && (
+                  {unitOf(newRow.unit).basis === "oppervlakte" && (
                     <>
                       <div className="grid gap-1.5">
                         <label className="text-sm text-muted-foreground">Breedte (m)</label>
@@ -307,7 +288,7 @@ export default function Configurator() {
                       </div>
                     </>
                   )}
-                  {newRow.unit === "lengte" && (
+                  {unitOf(newRow.unit).basis === "lengte" && (
                     <div className="grid gap-1.5 sm:col-span-2">
                       <label className="text-sm text-muted-foreground">Lengte (m)</label>
                       <Input type="number" min={0} step="0.01" value={newRow.width_mm ? newRow.width_mm / 1000 : ""}
@@ -329,7 +310,7 @@ export default function Configurator() {
 
                 <div className="grid grid-cols-1 gap-2 rounded-md bg-muted/40 p-3 text-sm sm:grid-cols-3">
                   <div>Hoeveelheid: <strong>{metrics(newRow)}</strong></div>
-                  <div>Prijs: <strong>{currency.format(newRow.unit_price)} {unitSuffix[newRow.unit]}</strong></div>
+                  <div>Prijs: <strong>{currency.format(newRow.unit_price)} {unitSuffix(unitOf(newRow.unit))}</strong></div>
                   <div className="sm:text-right">Regeltotaal: <strong>{currency.format(lineTotal(newRow))}</strong></div>
                 </div>
               </div>
