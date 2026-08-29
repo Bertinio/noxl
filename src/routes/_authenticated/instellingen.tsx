@@ -196,6 +196,61 @@ function SettingsPage() {
             </form>
           </CardContent>
         </Card>
+
+        <Card className="mt-6">
+          <CardHeader>
+            <CardTitle>Wachtwoord wijzigen</CardTitle>
+            <CardDescription>Kies een nieuw wachtwoord voor je account.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handlePasswordChange} className="grid gap-4">
+              <div className="grid gap-1.5">
+                <Label htmlFor="pw_current">Huidig wachtwoord</Label>
+                <Input
+                  id="pw_current"
+                  type="password"
+                  value={pw.current}
+                  onChange={(e) => setPw((p) => ({ ...p, current: e.target.value }))}
+                  required
+                  autoComplete="current-password"
+                />
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="pw_next">Nieuw wachtwoord</Label>
+                <Input
+                  id="pw_next"
+                  type="password"
+                  value={pw.next}
+                  onChange={(e) => setPw((p) => ({ ...p, next: e.target.value }))}
+                  required
+                  minLength={6}
+                  autoComplete="new-password"
+                />
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="pw_confirm">Bevestig nieuw wachtwoord</Label>
+                <Input
+                  id="pw_confirm"
+                  type="password"
+                  value={pw.confirm}
+                  onChange={(e) => setPw((p) => ({ ...p, confirm: e.target.value }))}
+                  required
+                  minLength={6}
+                  autoComplete="new-password"
+                />
+              </div>
+              <div>
+                <Button type="submit" disabled={pwBusy}>
+                  {pwBusy ? (
+                    <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Bezig…</>
+                  ) : (
+                    "Wachtwoord wijzigen"
+                  )}
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
       </div>
     </AppShell>
   );
