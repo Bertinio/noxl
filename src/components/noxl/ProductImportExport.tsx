@@ -10,21 +10,19 @@ import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { importProducts, listProducts } from "@/lib/noxl.functions";
+import { importProducts, listProducts, listUnits } from "@/lib/noxl.functions";
+import { useQuery } from "@tanstack/react-query";
 
-type Unit = "stuk" | "lengte" | "oppervlakte";
 type ParsedRow = {
   name: string;
   description: string | null;
   unit_price: number;
   category: string | null;
-  unit: Unit;
+  unit: string;
 };
 type PreviewRow = { row: number; data?: ParsedRow; errors: string[] };
 
-const ALLOWED_UNITS: Unit[] = ["stuk", "lengte", "oppervlakte"];
-
-function normalizeRows(raw: Record<string, unknown>[]): PreviewRow[] {
+function normalizeRows(raw: Record<string, unknown>[], allowedUnits: string[]): PreviewRow[] {
   return raw.map((r, i) => {
     const keys: Record<string, unknown> = {};
     for (const k of Object.keys(r)) keys[k.toLowerCase().trim()] = r[k];
@@ -33,7 +31,7 @@ function normalizeRows(raw: Record<string, unknown>[]): PreviewRow[] {
     const priceRaw = keys["unit_price"];
     const category = keys["category"] != null ? String(keys["category"]).trim() : "";
     const unitRaw = keys["unit"] != null ? String(keys["unit"]).trim().toLowerCase() : "";
-    const unit: Unit = (ALLOWED_UNITS.includes(unitRaw as Unit) ? unitRaw : "stuk") as Unit;
+    const unit = allowedUnits.includes(unitRaw) ? unitRaw : "stuk";
     const errors: string[] = [];
     if (!name) errors.push("name is verplicht");
     const priceNum = typeof priceRaw === "number"
@@ -41,7 +39,7 @@ function normalizeRows(raw: Record<string, unknown>[]): PreviewRow[] {
       : Number(String(priceRaw ?? "").replace(",", "."));
     if (!Number.isFinite(priceNum) || priceNum < 0) errors.push("unit_price ongeldig");
     if (name.length > 200) errors.push("name te lang");
-    if (unitRaw && !ALLOWED_UNITS.includes(unitRaw as Unit)) errors.push("unit ongeldig (stuk/lengte/oppervlakte)");
+    if (unitRaw && !allowedUnits.includes(unitRaw)) errors.push(`unit ongeldig (${allowedUnits.join("/")})`);
     return {
       row: i + 2,
       data: errors.length === 0
@@ -58,6 +56,9 @@ export function ProductImportExport() {
   const xlsxInputRef = useRef<HTMLInputElement>(null);
   const csvInputRef = useRef<HTMLInputElement>(null);
   const doImport = useServerFn(importProducts);
+  const fetchUnits = useServerFn(listUnits);
+  const unitsQ = useQuery({ queryKey: ["units"], queryFn: () => fetchUnits() });
+  const allowedUnits = (unitsQ.data ?? []).map((u) => u.code);
   const doList = useServerFn(listProducts);
 
   const [preview, setPreview] = useState<PreviewRow[] | null>(null);
@@ -81,7 +82,7 @@ export function ProductImportExport() {
       const sheet = wb.Sheets[wb.SheetNames[0]];
       const json = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: "" });
       setPreviewSource("xlsx");
-      setPreview(normalizeRows(json));
+      setPreview(normalizeRows(json, allowedUnits.length ? allowedUnits : ["stuk"]));
     } catch (e) {
       toast.error("Kon XLSX niet lezen: " + (e as Error).message);
     }
@@ -93,7 +94,7 @@ export function ProductImportExport() {
       skipEmptyLines: true,
       complete: (res) => {
         setPreviewSource("csv");
-        setPreview(normalizeRows(res.data));
+        setPreview(normalizeRows(res.data, allowedUnits.length ? allowedUnits : ["stuk"]));
       },
       error: (err) => toast.error("Kon CSV niet lezen: " + err.message),
     });
@@ -106,7 +107,7 @@ export function ProductImportExport() {
       description: p.description ?? "",
       unit_price: Number(p.unit_price) || 0,
       category: p.category ?? "",
-      unit: (p.unit ?? "stuk") as Unit,
+      unit: p.unit ?? "stuk",
     }));
   }
 

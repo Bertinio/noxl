@@ -53,6 +53,9 @@ export async function sendQuoteEmailWithSupabase(
 
 
 
+  const { data: unitRows } = await supabase.from("units").select("code, basis, symbol");
+  const unitMeta = new Map((unitRows ?? []).map((u) => [u.code, u]));
+
   const pdfBytes = await generateQuotePdf({
     quoteNumber: quote.quote_number,
     createdAt: quote.created_at,
@@ -67,7 +70,9 @@ export async function sendQuoteEmailWithSupabase(
       total_price: Number(it.total_price),
       width_mm: Number(it.width_mm ?? 0),
       height_mm: Number(it.height_mm ?? 0),
-      unit: (it.unit as "stuk" | "lengte" | "oppervlakte" | null) ?? "stuk",
+      unit: it.unit ?? "stuk",
+      unit_basis: (unitMeta.get(it.unit ?? "stuk")?.basis as "stuk" | "lengte" | "oppervlakte" | undefined) ?? null,
+      unit_symbol: unitMeta.get(it.unit ?? "stuk")?.symbol ?? null,
     })),
   });
 

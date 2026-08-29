@@ -410,6 +410,42 @@ export type Database = {
         }
         Relationships: []
       }
+      units: {
+        Row: {
+          active: boolean
+          basis: string
+          code: string
+          created_at: string
+          id: string
+          label: string
+          owner_id: string | null
+          symbol: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          basis?: string
+          code: string
+          created_at?: string
+          id?: string
+          label: string
+          owner_id?: string | null
+          symbol?: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          basis?: string
+          code?: string
+          created_at?: string
+          id?: string
+          label?: string
+          owner_id?: string | null
+          symbol?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string

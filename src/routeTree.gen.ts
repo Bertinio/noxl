@@ -20,6 +20,7 @@ import { Route as AuthenticatedDashboardRouteImport } from './routes/_authentica
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as AuthenticatedProjectsIdRouteImport } from './routes/_authenticated/projects.$id'
 import { Route as AuthenticatedCustomersIdRouteImport } from './routes/_authenticated/customers.$id'
+import { Route as AuthenticatedBeheerEenhedenRouteImport } from './routes/_authenticated/beheer.eenheden'
 import { Route as AuthenticatedBeheerInstallateursIndexRouteImport } from './routes/_authenticated/beheer.installateurs.index'
 import { Route as AuthenticatedQuotesIdPrintRouteImport } from './routes/_authenticated/quotes.$id.print'
 import { Route as AuthenticatedProjectsIdQuotesRouteImport } from './routes/_authenticated/projects.$id.quotes'
@@ -83,6 +84,12 @@ const AuthenticatedCustomersIdRoute =
     path: '/customers/$id',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedBeheerEenhedenRoute =
+  AuthenticatedBeheerEenhedenRouteImport.update({
+    id: '/beheer/eenheden',
+    path: '/beheer/eenheden',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedBeheerInstallateursIndexRoute =
   AuthenticatedBeheerInstallateursIndexRouteImport.update({
     id: '/beheer/installateurs/',
@@ -129,6 +136,7 @@ export interface FileRoutesByFullPath {
   '/instellingen': typeof AuthenticatedInstellingenRoute
   '/portal': typeof AuthenticatedPortalRoute
   '/products': typeof AuthenticatedProductsRoute
+  '/beheer/eenheden': typeof AuthenticatedBeheerEenhedenRoute
   '/customers/$id': typeof AuthenticatedCustomersIdRoute
   '/projects/$id': typeof AuthenticatedProjectsIdRouteWithChildren
   '/beheer/installateurs/$id': typeof AuthenticatedBeheerInstallateursIdRoute
@@ -147,6 +155,7 @@ export interface FileRoutesByTo {
   '/portal': typeof AuthenticatedPortalRoute
   '/products': typeof AuthenticatedProductsRoute
   '/': typeof AuthenticatedIndexRoute
+  '/beheer/eenheden': typeof AuthenticatedBeheerEenhedenRoute
   '/customers/$id': typeof AuthenticatedCustomersIdRoute
   '/projects/$id': typeof AuthenticatedProjectsIdRouteWithChildren
   '/beheer/installateurs/$id': typeof AuthenticatedBeheerInstallateursIdRoute
@@ -167,6 +176,7 @@ export interface FileRoutesById {
   '/_authenticated/portal': typeof AuthenticatedPortalRoute
   '/_authenticated/products': typeof AuthenticatedProductsRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
+  '/_authenticated/beheer/eenheden': typeof AuthenticatedBeheerEenhedenRoute
   '/_authenticated/customers/$id': typeof AuthenticatedCustomersIdRoute
   '/_authenticated/projects/$id': typeof AuthenticatedProjectsIdRouteWithChildren
   '/_authenticated/beheer/installateurs/$id': typeof AuthenticatedBeheerInstallateursIdRoute
@@ -187,6 +197,7 @@ export interface FileRouteTypes {
     | '/instellingen'
     | '/portal'
     | '/products'
+    | '/beheer/eenheden'
     | '/customers/$id'
     | '/projects/$id'
     | '/beheer/installateurs/$id'
@@ -205,6 +216,7 @@ export interface FileRouteTypes {
     | '/portal'
     | '/products'
     | '/'
+    | '/beheer/eenheden'
     | '/customers/$id'
     | '/projects/$id'
     | '/beheer/installateurs/$id'
@@ -224,6 +236,7 @@ export interface FileRouteTypes {
     | '/_authenticated/portal'
     | '/_authenticated/products'
     | '/_authenticated/'
+    | '/_authenticated/beheer/eenheden'
     | '/_authenticated/customers/$id'
     | '/_authenticated/projects/$id'
     | '/_authenticated/beheer/installateurs/$id'
@@ -319,6 +332,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedCustomersIdRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/beheer/eenheden': {
+      id: '/_authenticated/beheer/eenheden'
+      path: '/beheer/eenheden'
+      fullPath: '/beheer/eenheden'
+      preLoaderRoute: typeof AuthenticatedBeheerEenhedenRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/beheer/installateurs/': {
       id: '/_authenticated/beheer/installateurs/'
       path: '/beheer/installateurs'
@@ -388,6 +408,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedPortalRoute: typeof AuthenticatedPortalRoute
   AuthenticatedProductsRoute: typeof AuthenticatedProductsRoute
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
+  AuthenticatedBeheerEenhedenRoute: typeof AuthenticatedBeheerEenhedenRoute
   AuthenticatedCustomersIdRoute: typeof AuthenticatedCustomersIdRoute
   AuthenticatedProjectsIdRoute: typeof AuthenticatedProjectsIdRouteWithChildren
   AuthenticatedBeheerInstallateursIdRoute: typeof AuthenticatedBeheerInstallateursIdRoute
@@ -403,6 +424,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedPortalRoute: AuthenticatedPortalRoute,
   AuthenticatedProductsRoute: AuthenticatedProductsRoute,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
+  AuthenticatedBeheerEenhedenRoute: AuthenticatedBeheerEenhedenRoute,
   AuthenticatedCustomersIdRoute: AuthenticatedCustomersIdRoute,
   AuthenticatedProjectsIdRoute: AuthenticatedProjectsIdRouteWithChildren,
   AuthenticatedBeheerInstallateursIdRoute:

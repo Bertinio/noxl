@@ -1,5 +1,5 @@
 import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
-import { LayoutDashboard, Users, FolderKanban, LogOut, FileText, Home, Package, ShieldCheck, Settings } from "lucide-react";
+import { LayoutDashboard, Users, FolderKanban, LogOut, FileText, Home, Package, ShieldCheck, Settings, Ruler } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -33,6 +33,7 @@ const installerNav: NavItem[] = [
 
 const adminExtraNav: NavItem[] = [
   { title: "Installateurs", url: "/beheer/installateurs", icon: Users },
+  { title: "Eenheden", url: "/beheer/eenheden", icon: Ruler },
   { title: "Beheer", url: "/admin", icon: ShieldCheck },
 ];
 

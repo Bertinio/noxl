@@ -2,6 +2,8 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { one, handleError } from "@/lib/errors";
+import { computeLineTotal as sharedLineTotal, type UnitBasis } from "@/lib/units";
+
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
 
@@ -273,9 +275,129 @@ export const createProject = createServerFn({ method: "POST" })
     return { id: row.id };
   });
 
+// ---------- units ----------
+// Units are managed rows in public.units: global rows (owner_id IS NULL, admin
+// managed) plus per-installer rows. Products/configurations store the unit code.
+const unitCodeSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(50)
+  .regex(/^[a-z0-9_-]+$/, "Code mag enkel kleine letters, cijfers, - en _ bevatten");
+
+const unitBasisSchema = z.enum(["stuk", "lengte", "oppervlakte"]);
+
+const unitInputSchema = z.object({
+  code: unitCodeSchema,
+  label: z.string().trim().min(1).max(100),
+  symbol: z.string().trim().min(1).max(20),
+  basis: unitBasisSchema,
+  active: z.boolean().default(true),
+  scope: z.enum(["global", "own"]).default("own"),
+});
+
+export const listUnits = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { data, error } = await context.supabase
+      .from("units")
+      .select("id, owner_id, code, label, symbol, basis, active, created_at")
+      .order("owner_id", { ascending: true, nullsFirst: true })
+      .order("label", { ascending: true });
+    if (error) throw new Error(error.message);
+    return data ?? [];
+  });
+
+async function assertCanManageScope(supabase: SB, userId: string, scope: "global" | "own") {
+  if (scope === "global") await requireAdmin(supabase, userId);
+}
+
+export const createUnit = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => unitInputSchema.parse(i))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    await assertCanManageScope(supabase, userId, data.scope);
+    const { data: row, error } = await supabase
+      .from("units")
+      .insert({
+        owner_id: data.scope === "global" ? null : userId,
+        code: data.code,
+        label: data.label,
+        symbol: data.symbol,
+        basis: data.basis,
+        active: data.active,
+      })
+      .select("id")
+      .single();
+    if (error || !row) {
+      const dup = error?.code === "23505";
+      throw new Error(dup ? "Deze code bestaat al" : (error?.message ?? "Kon eenheid niet aanmaken"));
+    }
+    return { id: row.id };
+  });
+
+export const updateUnit = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    unitInputSchema.omit({ scope: true }).extend({ id: z.string().uuid() }).parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const { data: existing, error: exErr } = await supabase
+      .from("units")
+      .select("id, owner_id")
+      .eq("id", data.id)
+      .maybeSingle();
+    if (exErr) throw new Error(exErr.message);
+    if (!existing) throw new Error("Eenheid niet gevonden");
+    if (existing.owner_id === null) await requireAdmin(supabase, userId);
+    const { error } = await supabase
+      .from("units")
+      .update({
+        code: data.code,
+        label: data.label,
+        symbol: data.symbol,
+        basis: data.basis,
+        active: data.active,
+      })
+      .eq("id", data.id);
+    if (error) throw new Error(error.code === "23505" ? "Deze code bestaat al" : error.message);
+    return { ok: true };
+  });
+
+export const deleteUnit = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({ id: z.string().uuid() }).parse(i))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const { data: existing, error: exErr } = await supabase
+      .from("units")
+      .select("id, owner_id, code")
+      .eq("id", data.id)
+      .maybeSingle();
+    if (exErr) throw new Error(exErr.message);
+    if (!existing) throw new Error("Eenheid niet gevonden");
+    if (existing.owner_id === null) await requireAdmin(supabase, userId);
+    const { error } = await supabase.from("units").delete().eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+// Map unit codes to their calculation basis for the current user
+// (global units + the user's own units).
+async function unitBasisMap(supabase: SB): Promise<Record<string, UnitBasis>> {
+  const { data } = await supabase.from("units").select("code, basis");
+  const map: Record<string, UnitBasis> = {};
+  for (const u of data ?? []) {
+    if (u.basis === "stuk" || u.basis === "lengte" || u.basis === "oppervlakte") map[u.code] = u.basis;
+  }
+  return map;
+}
+
 // ---------- products ----------
-const unitSchema = z.enum(["stuk", "lengte", "oppervlakte"]);
-export type ProductUnit = z.infer<typeof unitSchema>;
+const unitSchema = unitCodeSchema.default("stuk");
+
 
 const productInputSchema = z.object({
   name: z.string().trim().min(1).max(200),
@@ -389,23 +511,11 @@ const configItemSchema = z.object({
   unit: unitSchema.default("stuk"),
 });
 
-function computeLineTotal(it: {
-  unit: ProductUnit;
-  width_mm: number;
-  height_mm: number;
-  quantity: number;
-  unit_price: number;
-}) {
-  const qty = it.quantity || 0;
-  if (it.unit === "oppervlakte") {
-    const area = (it.width_mm * it.height_mm) / 1_000_000;
-    return area * it.unit_price * qty;
-  }
-  if (it.unit === "lengte") {
-    const len = it.width_mm / 1000;
-    return len * it.unit_price * qty;
-  }
-  return qty * it.unit_price;
+function computeLineTotal(
+  it: { width_mm: number; height_mm: number; quantity: number; unit_price: number },
+  basis: UnitBasis,
+) {
+  return sharedLineTotal(basis, it);
 }
 
 export const saveConfigurations = createServerFn({ method: "POST" })
@@ -424,10 +534,12 @@ export const saveConfigurations = createServerFn({ method: "POST" })
       .eq("project_id", data.project_id);
     if (delErr) throw new Error(delErr.message);
 
+    const bases = await unitBasisMap(supabase);
     const computed = data.items.map((it) => ({
       it,
-      line: Number(computeLineTotal(it).toFixed(2)),
+      line: Number(computeLineTotal(it, bases[it.unit] ?? "stuk").toFixed(2)),
     }));
+
 
     if (computed.length > 0) {
       const payload = computed.map(({ it, line }) => ({

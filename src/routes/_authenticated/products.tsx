@@ -16,7 +16,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Toaster } from "@/components/ui/sonner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { listProducts, createProduct, updateProduct, deleteProduct } from "@/lib/noxl.functions";
+import { listProducts, createProduct, updateProduct, deleteProduct, listUnits } from "@/lib/noxl.functions";
+import { resolveUnit, unitSuffix, type UnitDef } from "@/lib/units";
 import { ProductImportExport } from "@/components/noxl/ProductImportExport";
 
 export const Route = createFileRoute("/_authenticated/products")({
@@ -29,11 +30,7 @@ export const Route = createFileRoute("/_authenticated/products")({
 
 const currency = new Intl.NumberFormat("nl-BE", { style: "currency", currency: "EUR" });
 
-type Unit = "stuk" | "lengte" | "oppervlakte";
-const unitSuffix: Record<Unit, string> = { stuk: "/ stuk", lengte: "/ meter", oppervlakte: "/ m²" };
-const unitLabel: Record<Unit, string> = { stuk: "Stuk", lengte: "Lengte (per meter)", oppervlakte: "Oppervlakte (per m²)" };
-
-type Form = { id?: string; name: string; description: string; unit_price: number; category: string; unit: Unit };
+type Form = { id?: string; name: string; description: string; unit_price: number; category: string; unit: string };
 const empty: Form = { name: "", description: "", unit_price: 0, category: "", unit: "stuk" };
 
 
@@ -44,10 +41,16 @@ function ProductsPage() {
   const doUpdate = useServerFn(updateProduct);
   const doDelete = useServerFn(deleteProduct);
 
+  const fetchUnits = useServerFn(listUnits);
   const products = useQuery({ queryKey: ["products"], queryFn: () => fetchProducts() });
+  const unitsQ = useQuery({ queryKey: ["units"], queryFn: () => fetchUnits() });
+  const units: UnitDef[] = (unitsQ.data ?? []).map((u) => ({ ...u, basis: u.basis as UnitDef["basis"] }));
+  const activeUnits = units.filter((u) => u.active !== false);
 
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<Form>(empty);
+  const formUnit = resolveUnit(units, form.unit);
+
 
   const saveMut = useMutation({
     mutationFn: async () => {
@@ -81,11 +84,11 @@ function ProductsPage() {
 
   function openNew() { setForm(empty); setOpen(true); }
   function openEdit(p: { id: string; name: string; description: string | null; unit_price: number | string; category: string | null; unit?: string | null }) {
-    const u = (p.unit ?? "stuk") as Unit;
+
     setForm({
       id: p.id, name: p.name, description: p.description ?? "",
       unit_price: Number(p.unit_price) || 0, category: p.category ?? "",
-      unit: (["stuk", "lengte", "oppervlakte"].includes(u) ? u : "stuk") as Unit,
+      unit: p.unit ?? "stuk",
     });
     setOpen(true);
   }
@@ -119,8 +122,7 @@ function ProductsPage() {
               </TableHeader>
               <TableBody>
                 {(products.data ?? []).map((p) => {
-                  const u = ((p.unit ?? "stuk") as Unit);
-                  const suffix = unitSuffix[["stuk","lengte","oppervlakte"].includes(u) ? u : "stuk"];
+                  const suffix = unitSuffix(resolveUnit(units, p.unit));
                   return (
                     <TableRow key={p.id}>
                       <TableCell className="font-medium">{p.name}</TableCell>
@@ -159,12 +161,12 @@ function ProductsPage() {
             </div>
             <div className="grid gap-1.5">
               <Label>Eenheid</Label>
-              <Select value={form.unit} onValueChange={(v) => setForm({ ...form, unit: v as Unit })}>
+              <Select value={form.unit} onValueChange={(v) => setForm({ ...form, unit: v })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="stuk">{unitLabel.stuk}</SelectItem>
-                  <SelectItem value="lengte">{unitLabel.lengte}</SelectItem>
-                  <SelectItem value="oppervlakte">{unitLabel.oppervlakte}</SelectItem>
+                  {activeUnits.map((u) => (
+                    <SelectItem key={u.code} value={u.code}>{u.label}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -173,7 +175,7 @@ function ProductsPage() {
               <Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={3} />
             </div>
             <div className="grid gap-1.5">
-              <Label>Prijs {unitSuffix[form.unit]} (€)</Label>
+              <Label>Prijs {unitSuffix(formUnit)} (€)</Label>
               <Input type="number" min={0} step="0.01" value={form.unit_price}
                 onChange={(e) => setForm({ ...form, unit_price: Number(e.target.value) || 0 })} />
             </div>
