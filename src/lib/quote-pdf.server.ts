@@ -1,6 +1,6 @@
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 
-type Unit = "stuk" | "lengte" | "oppervlakte";
+type UnitBasis = "stuk" | "lengte" | "oppervlakte";
 type Item = {
   description: string;
   quantity: number;
@@ -8,7 +8,9 @@ type Item = {
   total_price: number;
   width_mm?: number;
   height_mm?: number;
-  unit?: Unit | null;
+  unit?: string | null;
+  unit_basis?: UnitBasis | null;
+  unit_symbol?: string | null;
 };
 
 type QuotePdfInput = {
@@ -145,19 +147,16 @@ export async function generateQuotePdf(input: QuotePdfInput): Promise<Uint8Array
 
   for (const it of input.items) {
     if (y < 80) break;
-    const unit = it.unit ?? "stuk";
+    const basis: UnitBasis = it.unit_basis ?? (it.unit === "lengte" || it.unit === "oppervlakte" ? it.unit : "stuk");
+    const symbol = it.unit_symbol || (basis === "oppervlakte" ? "m²" : basis === "lengte" ? "m" : (it.unit || "stuk"));
     let qtyLabel = String(it.quantity);
-    let priceLabel = eur(Number(it.unit_price));
-    if (unit === "oppervlakte") {
+    let priceLabel = `${eur(Number(it.unit_price))} / ${symbol}`;
+    if (basis === "oppervlakte") {
       const area = ((it.width_mm ?? 0) * (it.height_mm ?? 0)) / 1_000_000;
-      qtyLabel = `${it.quantity} × ${area.toFixed(2)} m²`;
-      priceLabel = `${eur(Number(it.unit_price))} / m²`;
-    } else if (unit === "lengte") {
+      qtyLabel = `${it.quantity} × ${area.toFixed(2)} ${symbol}`;
+    } else if (basis === "lengte") {
       const len = (it.width_mm ?? 0) / 1000;
-      qtyLabel = `${it.quantity} × ${len.toFixed(2)} m`;
-      priceLabel = `${eur(Number(it.unit_price))} / m`;
-    } else {
-      priceLabel = `${eur(Number(it.unit_price))} / stuk`;
+      qtyLabel = `${it.quantity} × ${len.toFixed(2)} ${symbol}`;
     }
     const desc = it.description.length > 60 ? it.description.slice(0, 57) + "..." : it.description;
     draw(desc, colX.desc, y);
