@@ -747,13 +747,17 @@ export const listInstallers = createServerFn({ method: "GET" })
       rolesByUser.set(r.user_id, arr);
     }
 
+    // All users are installers or admins — show both in the management list.
     const installerIds = (userList?.users ?? [])
-      .filter((u) => (rolesByUser.get(u.id) ?? []).includes("installer"))
+      .filter((u) => {
+        const r = rolesByUser.get(u.id) ?? [];
+        return r.includes("installer") || r.includes("admin");
+      })
       .map((u) => u.id);
 
     const { data: settings } = await supabaseAdmin
       .from("installer_settings")
-      .select("user_id, name, company")
+      .select("user_id, name, company, active")
       .in("user_id", installerIds.length > 0 ? installerIds : ["00000000-0000-0000-0000-000000000000"]);
     const settingsByUser = new Map(
       (settings ?? []).map((s) => [s.user_id, s] as const),
@@ -764,6 +768,8 @@ export const listInstallers = createServerFn({ method: "GET" })
         const u = userList!.users.find((x) => x.id === id)!;
         const s = settingsByUser.get(id) ?? null;
         const stats = await computeInstallerStats(supabaseAdmin as unknown as SB, id);
+        const banned = Boolean((u as { banned_until?: string | null }).banned_until
+          && new Date((u as { banned_until?: string | null }).banned_until as string) > new Date());
         return {
           id: u.id,
           email: u.email ?? "",
@@ -771,11 +777,15 @@ export const listInstallers = createServerFn({ method: "GET" })
           company: s?.company ?? null,
           roles: rolesByUser.get(u.id) ?? [],
           last_sign_in_at: u.last_sign_in_at ?? null,
+          active: (s?.active ?? true) && !banned,
           generated: stats.generated,
           sent: stats.sent,
+          open: stats.open,
+          last_quote_at: stats.last_quote_at,
         };
       }),
     );
+
 
     return { installers: rows };
   });
