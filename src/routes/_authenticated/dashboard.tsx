@@ -56,7 +56,7 @@ function Dashboard() {
 
   const [custOpen, setCustOpen] = useState(false);
   const [projOpen, setProjOpen] = useState(false);
-  const [custForm, setCustForm] = useState({ name: "", email: "", company: "", address: "", invite: true });
+  const [custForm, setCustForm] = useState({ name: "", email: "", company: "", address: "" });
   const [projForm, setProjForm] = useState({ customer_id: "", title: "", description: "" });
 
   const createCustMut = useMutation({
@@ -67,13 +67,13 @@ function Dashboard() {
           email: custForm.email,
           company: custForm.company || null,
           address: custForm.address || null,
-          invite: custForm.invite,
+          invite: false,
         },
       }),
     onSuccess: () => {
       toast.success("Klant aangemaakt");
       setCustOpen(false);
-      setCustForm({ name: "", email: "", company: "", address: "", invite: true });
+      setCustForm({ name: "", email: "", company: "", address: "" });
       qc.invalidateQueries({ queryKey: ["customers"] });
     },
     onError: (e: Error) => toast.error(e.message),
