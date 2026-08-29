@@ -12,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Toaster } from "@/components/ui/sonner";
 import { getInstallerSettings, updateInstallerSettings } from "@/lib/noxl.functions";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/_authenticated/instellingen")({
   head: () => ({
@@ -34,6 +35,32 @@ function SettingsPage() {
   });
 
   const [form, setForm] = useState({ name: "", company: "", address: "", vat_number: "", terms: "", vat_rate: 21 as 6 | 21 });
+  const [pw, setPw] = useState({ current: "", next: "", confirm: "" });
+  const [pwBusy, setPwBusy] = useState(false);
+
+  async function handlePasswordChange(e: React.FormEvent) {
+    e.preventDefault();
+    if (pw.next !== pw.confirm) {
+      toast.error("Nieuwe wachtwoorden komen niet overeen");
+      return;
+    }
+    setPwBusy(true);
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: pw.next,
+        current_password: pw.current,
+      });
+      if (error) throw error;
+      toast.success("Wachtwoord gewijzigd");
+      setPw({ current: "", next: "", confirm: "" });
+    } catch (err) {
+      toast.error("Mislukt", {
+        description: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      setPwBusy(false);
+    }
+  }
 
   useEffect(() => {
     if (data) {
@@ -163,6 +190,61 @@ function SettingsPage() {
                     <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Bezig…</>
                   ) : (
                     <><Save className="mr-2 h-4 w-4" /> Opslaan</>
+                  )}
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+
+        <Card className="mt-6">
+          <CardHeader>
+            <CardTitle>Wachtwoord wijzigen</CardTitle>
+            <CardDescription>Kies een nieuw wachtwoord voor je account.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handlePasswordChange} className="grid gap-4">
+              <div className="grid gap-1.5">
+                <Label htmlFor="pw_current">Huidig wachtwoord</Label>
+                <Input
+                  id="pw_current"
+                  type="password"
+                  value={pw.current}
+                  onChange={(e) => setPw((p) => ({ ...p, current: e.target.value }))}
+                  required
+                  autoComplete="current-password"
+                />
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="pw_next">Nieuw wachtwoord</Label>
+                <Input
+                  id="pw_next"
+                  type="password"
+                  value={pw.next}
+                  onChange={(e) => setPw((p) => ({ ...p, next: e.target.value }))}
+                  required
+                  minLength={6}
+                  autoComplete="new-password"
+                />
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="pw_confirm">Bevestig nieuw wachtwoord</Label>
+                <Input
+                  id="pw_confirm"
+                  type="password"
+                  value={pw.confirm}
+                  onChange={(e) => setPw((p) => ({ ...p, confirm: e.target.value }))}
+                  required
+                  minLength={6}
+                  autoComplete="new-password"
+                />
+              </div>
+              <div>
+                <Button type="submit" disabled={pwBusy}>
+                  {pwBusy ? (
+                    <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Bezig…</>
+                  ) : (
+                    "Wachtwoord wijzigen"
                   )}
                 </Button>
               </div>
