@@ -41,6 +41,27 @@ function AuthPage() {
     return () => sub.subscription.unsubscribe();
   }, [navigate]);
 
+  async function handleForgot(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+      if (error) throw error;
+      setResetSent(true);
+      toast.success("Resetlink verstuurd", {
+        description: "Controleer je e-mail om je wachtwoord opnieuw in te stellen.",
+      });
+    } catch (err) {
+      toast.error("Mislukt", {
+        description: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function handleEmail(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
