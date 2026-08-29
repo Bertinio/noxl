@@ -99,7 +99,7 @@ function Dashboard() {
   });
 
   if (role.isLoading) return <div className="flex min-h-screen items-center justify-center"><Loader2 className="h-6 w-6 animate-spin" /></div>;
-  if (role.data?.role !== "admin") {
+  if (role.data?.role === "customer") {
     return (
       <div className="flex min-h-screen items-center justify-center p-6 text-center">
         <div>
