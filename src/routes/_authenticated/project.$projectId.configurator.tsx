@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
@@ -10,8 +10,11 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Toaster } from "@/components/ui/sonner";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { getProject, saveConfigurations, listProducts, listUnits } from "@/lib/noxl.functions";
+import { ProductSelectField } from "@/components/noxl/ProductSelectField";
+import type { ProductSaveIntent } from "@/components/noxl/ProductFormDialog";
+import { getProject, saveConfigurations, listProducts, listUnits, createProduct, getMyRole } from "@/lib/noxl.functions";
+import { getSession } from "@/lib/auth-client";
+import { applyCreatedProduct, canCreateProducts, type ProductWriteInput } from "@/lib/product-input";
 import { resolveUnit, unitSuffix, computeLineTotal, metricsLabel, type UnitDef } from "@/lib/units";
 
 export const Route = createFileRoute("/_authenticated/project/$projectId/configurator")({
@@ -40,16 +43,23 @@ function emptyRow(): Row {
 
 export default function Configurator() {
   const { projectId } = Route.useParams();
+  const navigate = useNavigate();
   const qc = useQueryClient();
   const fetchProject = useServerFn(getProject);
   const fetchProducts = useServerFn(listProducts);
   const doSave = useServerFn(saveConfigurations);
+  const doCreate = useServerFn(createProduct);
+  const fetchRole = useServerFn(getMyRole);
 
   const projectQ = useQuery({
     queryKey: ["project", projectId],
     queryFn: () => fetchProject({ data: { id: projectId } }),
   });
   const productsQ = useQuery({ queryKey: ["products"], queryFn: () => fetchProducts() });
+  const roleQ = useQuery({ queryKey: ["my-role"], queryFn: () => fetchRole() });
+  const sessionQ = useQuery({ queryKey: ["session"], queryFn: () => getSession() });
+  const canCreate = canCreateProducts(roleQ.data?.role);
+  const ownerId = sessionQ.data?.user.id ?? "";
   const fetchUnits = useServerFn(listUnits);
   const unitsQ = useQuery({ queryKey: ["units"], queryFn: () => fetchUnits() });
   const units: UnitDef[] = (unitsQ.data ?? []).map((u) => ({ ...u, basis: u.basis as UnitDef["basis"] }));
@@ -107,6 +117,30 @@ export default function Configurator() {
     },
     onError: (e: Error) => toast.error(e.message),
   });
+
+  function selectCreated(product: {
+    id: string;
+    name: string;
+    description: string | null;
+    unit_price: number | string;
+    unit: string | null;
+  }) {
+    setNewRow((row) => applyCreatedProduct(row, product));
+  }
+
+  async function createFromConfigurator(value: ProductWriteInput, intent: ProductSaveIntent) {
+    const created = await doCreate({ data: value });
+    qc.setQueryData<NonNullable<typeof productsQ.data>>(["products"], (current) => {
+      const list = current ?? [];
+      if (list.some((item) => item.id === created.id)) return list;
+      return [created, ...list];
+    });
+    void qc.invalidateQueries({ queryKey: ["products"] });
+    selectCreated(created);
+    if (intent === "edit-full") {
+      await navigate({ to: "/products", search: { product: created.id } });
+    }
+  }
 
   function pickProduct(productId: string) {
     const p = (productsQ.data ?? []).find((x) => x.id === productId);
@@ -244,27 +278,22 @@ export default function Configurator() {
         <Card>
           <CardHeader><CardTitle className="text-xl sm:text-lg">Nieuwe regel toevoegen</CardTitle></CardHeader>
           <CardContent>
-            {products.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                Nog geen producten. Voeg eerst producten toe via <Link to="/products" className="underline">Producten</Link>.
-              </p>
-            ) : (
-              <div className="grid gap-3">
-                <div className="grid gap-1.5">
-                  <label className="text-sm text-muted-foreground">Product</label>
-                  <Select value={newRow.product_id} onValueChange={pickProduct}>
-                    <SelectTrigger className="min-h-11"><SelectValue placeholder="Kies een product" /></SelectTrigger>
-                    <SelectContent>
-                      {products.map((p) => {
-                        return (
-                          <SelectItem key={p.id} value={p.id}>
-                            {p.name} — {currency.format(Number(p.unit_price) || 0)} {unitSuffix(unitOf(p.unit))}
-                          </SelectItem>
-                        );
-                      })}
-                    </SelectContent>
-                  </Select>
-                </div>
+            <div className="grid gap-3">
+                <ProductSelectField
+                  products={products}
+                  units={units}
+                  value={newRow.product_id}
+                  onValueChange={pickProduct}
+                  canCreate={canCreate}
+                  ownerId={ownerId}
+                  unitOf={unitOf}
+                  onCreate={createFromConfigurator}
+                />
+                {products.length === 0 && !canCreate ? (
+                  <p className="text-sm text-muted-foreground">
+                    Nog geen producten. Vraag een beheerder om je installateursrechten.
+                  </p>
+                ) : null}
 
                 <div className="grid gap-1.5">
                   <label className="text-sm text-muted-foreground">Beschrijving</label>
@@ -313,8 +342,7 @@ export default function Configurator() {
                   <div>Prijs: <strong>{currency.format(newRow.unit_price)} {unitSuffix(unitOf(newRow.unit))}</strong></div>
                   <div className="sm:text-right">Regeltotaal: <strong>{currency.format(lineTotal(newRow))}</strong></div>
                 </div>
-              </div>
-            )}
+            </div>
           </CardContent>
         </Card>
       </div>

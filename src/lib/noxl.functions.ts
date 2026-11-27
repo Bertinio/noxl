@@ -3,6 +3,14 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { one, handleError } from "@/lib/errors";
 import { computeLineTotal as sharedLineTotal, type UnitBasis } from "@/lib/units";
+import {
+  assertCanCreateProducts,
+  buildProductFields,
+  buildProductInsert,
+  hasDuplicateProductCode,
+  productWriteError,
+  productWriteSchema,
+} from "@/lib/product-input";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
@@ -387,64 +395,70 @@ async function unitBasisMap(supabase: SB): Promise<Record<string, UnitBasis>> {
 
 // ---------- products ----------
 const unitSchema = unitCodeSchema.default("stuk");
+const productUpdateSchema = productWriteSchema.extend({ id: z.string().uuid() });
 
+async function requireProductAuthor(supabase: SB, userId: string) {
+  const { data, error } = await supabase.from("user_roles").select("role").eq("user_id", userId);
+  if (error) throw new Error(error.message);
+  assertCanCreateProducts((data ?? []).map((row) => row.role));
+}
 
-const productInputSchema = z.object({
-  name: z.string().trim().min(1).max(200),
-  description: z.string().trim().max(2000).optional().nullable(),
-  unit_price: z.number().min(0).max(1_000_000),
-  category: z.string().trim().max(100).optional().nullable(),
-  unit: unitSchema.default("stuk"),
-});
+async function assertUniqueProductCode(supabase: SB, userId: string, code: string, exceptId?: string) {
+  const { data, error } = await supabase
+    .from("products")
+    .select("id, code, owner_id")
+    .eq("owner_id", userId);
+  if (error) throw new Error(error.message);
+  if (hasDuplicateProductCode(data ?? [], code, userId, exceptId)) {
+    throw new Error("Deze productcode bestaat al");
+  }
+}
 
 export const listProducts = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { data, error } = await context.supabase
+    const full = await context.supabase
       .from("products")
-      .select("id, name, description, unit_price, category, unit, created_at")
+      .select("id, name, code, description, unit_price, category, manufacturer, unit, created_at")
       .order("created_at", { ascending: false });
-    if (error) throw new Error(error.message);
-    return data ?? [];
+    if (full.error && /does not exist|schema cache/i.test(full.error.message)) {
+      const legacy = await context.supabase
+        .from("products")
+        .select("id, name, description, unit_price, category, unit, created_at")
+        .order("created_at", { ascending: false });
+      if (legacy.error) throw new Error(legacy.error.message);
+      return (legacy.data ?? []).map((row) => ({ ...row, code: null, manufacturer: null }));
+    }
+    if (full.error) throw new Error(full.error.message);
+    return full.data ?? [];
   });
 
 export const createProduct = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i: unknown) => productInputSchema.parse(i))
+  .inputValidator((i: unknown) => productWriteSchema.parse(i))
   .handler(async ({ data, context }) => {
+    await requireProductAuthor(context.supabase, context.userId);
+    await assertUniqueProductCode(context.supabase, context.userId, data.code);
     const { data: row, error } = await context.supabase
       .from("products")
-      .insert({
-        owner_id: context.userId,
-        name: data.name,
-        description: data.description ?? null,
-        unit_price: data.unit_price,
-        category: data.category ?? null,
-        unit: data.unit,
-      })
-      .select("id")
+      .insert(buildProductInsert(context.userId, data))
+      .select("id, name, code, description, unit_price, category, manufacturer, unit, created_at")
       .single();
-    if (error || !row) throw new Error(error?.message ?? "Kon product niet aanmaken");
-    return { id: row.id };
+    if (error || !row) throw new Error(productWriteError(error?.message ?? "Kon product niet aanmaken"));
+    return row;
   });
 
 export const updateProduct = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i: unknown) =>
-    productInputSchema.extend({ id: z.string().uuid() }).parse(i),
-  )
+  .inputValidator((i: unknown) => productUpdateSchema.parse(i))
   .handler(async ({ data, context }) => {
+    await requireProductAuthor(context.supabase, context.userId);
+    await assertUniqueProductCode(context.supabase, context.userId, data.code, data.id);
     const { error } = await context.supabase
       .from("products")
-      .update({
-        name: data.name,
-        description: data.description ?? null,
-        unit_price: data.unit_price,
-        category: data.category ?? null,
-        unit: data.unit,
-      })
+      .update(buildProductFields(data))
       .eq("id", data.id);
-    if (error) throw new Error(error.message);
+    if (error) throw new Error(productWriteError(error.message));
     return { ok: true };
   });
 
@@ -472,6 +486,7 @@ export const importProducts = createServerFn({ method: "POST" })
     z.object({ rows: z.array(importRowSchema).min(1).max(5000) }).parse(i),
   )
   .handler(async ({ data, context }) => {
+    await requireProductAuthor(context.supabase, context.userId);
     const payload = data.rows.map((r) => ({
       owner_id: context.userId,
       name: r.name,

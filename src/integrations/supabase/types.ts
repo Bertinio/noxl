@@ -158,9 +158,11 @@ export type Database = {
       products: {
         Row: {
           category: string | null
+          code: string | null
           created_at: string
           description: string | null
           id: string
+          manufacturer: string | null
           name: string
           owner_id: string
           unit: string
@@ -169,9 +171,11 @@ export type Database = {
         }
         Insert: {
           category?: string | null
+          code?: string | null
           created_at?: string
           description?: string | null
           id?: string
+          manufacturer?: string | null
           name: string
           owner_id?: string
           unit?: string
@@ -180,9 +184,11 @@ export type Database = {
         }
         Update: {
           category?: string | null
+          code?: string | null
           created_at?: string
           description?: string | null
           id?: string
+          manufacturer?: string | null
           name?: string
           owner_id?: string
           unit?: string
